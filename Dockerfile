@@ -5,13 +5,15 @@
 FROM node:24-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
+# npm ci 뒤 postinstall(patch-package)이 패치를 적용한다
+COPY patches ./patches
 RUN npm ci --no-audit --no-fund
 
 FROM deps AS builder
 ENV NEXT_TELEMETRY_DISABLED=1
 COPY . .
 RUN npm run build \
- && npx esbuild scripts/migrate.mjs --bundle --platform=node --format=cjs --outfile=dist/migrate.cjs
+ && npx esbuild scripts/migrate.ts --bundle --platform=node --format=cjs --outfile=dist/migrate.cjs
 
 FROM node:24-alpine AS runner
 WORKDIR /app

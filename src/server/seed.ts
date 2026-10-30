@@ -3,6 +3,7 @@ import { sql } from "drizzle-orm";
 import { DEFAULT_TAGS } from "@/lib/items";
 import { items as mockItems } from "@/mocks/items";
 import { memos as mockMemos } from "@/mocks/memos";
+import { cautions as mockCautions } from "@/mocks/cautions";
 import { questions as mockQuestions } from "@/mocks/questions";
 import { rescheduleProposal } from "@/mocks/reschedule";
 import { eveningBriefing, morningBriefing } from "@/mocks/briefing";
@@ -13,9 +14,13 @@ import * as s from "@/server/db/schema";
 import { dtIn } from "@/server/db/convert";
 import type { Db } from "@/server/db/types";
 import { writeItem } from "@/server/services/items";
+import { writeCaution } from "@/server/services/cautions";
 
 /** 시드가 지우고 다시 채우는 테이블 (FK 역순) */
 const TABLES = [
+  s.cautionTags,
+  s.cautionWiki,
+  s.cautions,
   s.wikiComments,
   s.wikiRevisions,
   s.questions,
@@ -151,6 +156,12 @@ export async function seedDemo(db: Db, { force = false } = {}) {
       { kind: "morning", date: morningBriefing.date, generatedAt: dtIn(morningBriefing.generatedAt)!, payload: morningBriefing },
       { kind: "evening", date: eveningBriefing.date, generatedAt: dtIn(eveningBriefing.generatedAt)!, payload: eveningBriefing },
     ]);
+
+    for (const c of mockCautions) {
+      const bad = c.wikiRefs.filter((w) => !slugs.has(w));
+      if (bad.length) warnings.push(`${c.id}: 없는 위키 연결 ${bad.join(", ")}`);
+      await writeCaution(tx, c);
+    }
 
     await tx.insert(s.people).values(mockPeople);
   });

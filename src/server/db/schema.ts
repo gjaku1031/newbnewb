@@ -209,6 +209,55 @@ export const wikiComments = mysqlTable("wiki_comments", {
   note: varchar("note", { length: 500 }),
 });
 
+/* ───────── 주의할 점 (실수·지적 노트) ───────── */
+
+export const cautions = mysqlTable("cautions", {
+  id: varchar("id", { length: 64 }).primaryKey(),
+  /** 주의할 점 한 줄 (맞는 방법 중심) */
+  point: varchar("point", { length: 500 }).notNull(),
+  /** 무엇이 문제였는지 */
+  wrong: varchar("wrong", { length: 1000 }),
+  /** 지적한 사람의 직책만 (이름은 남기지 않음) */
+  byRole: varchar("by_role", { length: 50 }),
+  sourceKind: varchar("source_kind", { length: 12 }).$type<"memo" | "question" | "wiki" | "manual">().notNull(),
+  sourceId: varchar("source_id", { length: 128 }),
+  createdOn: date("created_on", { mode: "string" }).notNull(),
+  nextReview: date("next_review", { mode: "string" }).notNull(),
+  intervalDays: int("interval_days").notNull(),
+  /** 충분히 익혀서 더는 알려주지 않음 */
+  archived: boolean("archived").notNull().default(false),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+});
+
+export const cautionWiki = mysqlTable(
+  "caution_wiki",
+  {
+    cautionId: varchar("caution_id", { length: 64 })
+      .notNull()
+      .references(() => cautions.id, { onDelete: "cascade" }),
+    slug: varchar("slug", { length: 128 })
+      .notNull()
+      .references(() => wikiPages.slug, { onDelete: "cascade" }),
+    sort: int("sort").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.cautionId, t.slug] })],
+);
+
+export const cautionTags = mysqlTable(
+  "caution_tags",
+  {
+    cautionId: varchar("caution_id", { length: 64 })
+      .notNull()
+      .references(() => cautions.id, { onDelete: "cascade" }),
+    tagId: varchar("tag_id", { length: 64 })
+      .notNull()
+      .references(() => tags.id, { onDelete: "cascade" }),
+    sort: int("sort").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.cautionId, t.tagId] })],
+);
+
 /* ───────── 메모 · 질문 · 재배치 · 브리핑 ───────── */
 
 export const memos = mysqlTable("memos", {

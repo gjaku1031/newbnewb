@@ -1,5 +1,6 @@
 import type { Tag } from "@/lib/items";
 import type {
+  Caution,
   EveningBriefing,
   Item,
   MorningBriefing,
@@ -25,6 +26,7 @@ export interface WorkspaceSnapshot {
   wiki: WikiData;
   memos: Memo[];
   questions: QuestionRecord[];
+  cautions: Caution[];
   briefing: { morning: MorningBriefing | null; evening: EveningBriefing | null };
   reschedule: RescheduleProposal | null;
 }

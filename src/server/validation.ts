@@ -66,3 +66,19 @@ export const ReviewInput = z.object({
 export const MemoInput = z.object({ id: Id, text: z.string().trim().min(1).max(5000) });
 
 export const SourceTypeInput = z.enum(["manual", "guideline", "boss_answer", "peer_advice", "note"]);
+
+export const CautionInput = z.object({
+  id: Id,
+  point: z.string().trim().min(1).max(500),
+  wrong: Short(1000).optional(),
+  by: Short(50).optional(),
+  source: z.object({
+    kind: z.enum(["memo", "question", "wiki", "manual"]),
+    id: z.string().max(128).optional(),
+  }),
+  wikiRefs: z.array(Slug).max(50),
+  tags: z.array(Id).max(50),
+  createdAt: LocalDate,
+  review: z.object({ nextReview: LocalDate, intervalDays: z.number().int().min(1).max(365) }),
+  archived: z.boolean().optional(),
+});

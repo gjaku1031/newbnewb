@@ -17,6 +17,8 @@ import * as itemsService from "@/server/services/items";
 import * as wiki from "@/server/services/wiki";
 import * as memosService from "@/server/services/memos";
 import * as records from "@/server/services/records";
+import * as cautionsService from "@/server/services/cautions";
+import type { Caution } from "@/lib/types";
 
 /** 응답을 보낸 뒤 실행 (실패해도 요청은 성공으로 끝나고, 서버 로그에 남긴다) */
 function later(name: string, task: () => Promise<unknown>) {
@@ -140,4 +142,28 @@ export async function answerMissing(id: string, index: number, answer: string) {
 export async function applyReschedule(id: string, acceptedItemIds: string[]) {
   await requireUser();
   return records.applyReschedule(getDb(), v.Id.parse(id), z.array(v.Id).max(200).parse(acceptedItemIds));
+}
+
+/* ───────── 주의할 점 ───────── */
+
+/** 추가·수정 모두 통째로 저장 (화면에서 id·날짜를 정해 보낸다) */
+export async function saveCaution(input: Caution) {
+  await requireUser();
+  await cautionsService.saveCaution(getDb(), v.CautionInput.parse(input) as Caution);
+}
+
+export async function deleteCaution(id: string) {
+  await requireUser();
+  await cautionsService.deleteCaution(getDb(), v.Id.parse(id));
+}
+
+/** 다시 봤어요 — 다음 날짜는 서버가 정한다 */
+export async function reviewCaution(id: string) {
+  await requireUser();
+  return cautionsService.reviewCaution(getDb(), v.Id.parse(id));
+}
+
+export async function setCautionArchived(id: string, archived: boolean) {
+  await requireUser();
+  await cautionsService.setCautionArchived(getDb(), v.Id.parse(id), z.boolean().parse(archived));
 }

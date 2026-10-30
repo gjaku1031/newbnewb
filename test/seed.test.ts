@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { items as mockItems } from "@/mocks/items";
 import { memos as mockMemos } from "@/mocks/memos";
+import { cautions as mockCautions } from "@/mocks/cautions";
 import { questions as mockQuestions } from "@/mocks/questions";
 import { rescheduleProposal } from "@/mocks/reschedule";
 import { eveningBriefing, morningBriefing } from "@/mocks/briefing";
@@ -30,6 +31,7 @@ describe("시드 → 작업공간 스냅샷", () => {
     expect(byId(ws.wiki.revisions)).toEqual(byId(seedRevisions()));
     expect(byId(ws.questions)).toEqual(byId(mockQuestions));
     expect(byId(ws.memos)).toEqual(byId(mockMemos));
+    expect(byId(ws.cautions)).toEqual(byId(mockCautions));
     expect(norm(ws.reschedule)).toEqual(norm(rescheduleProposal));
     expect(ws.briefing).toEqual({ morning: morningBriefing, evening: eveningBriefing });
     expect(ws.wiki.sources.map((s) => s.id).sort()).toEqual(mockSources.map((s) => s.id).sort());

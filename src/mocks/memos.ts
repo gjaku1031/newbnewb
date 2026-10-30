@@ -26,4 +26,15 @@ export const memos: Memo[] = [
       ],
     },
   },
+  // 주의할 점 목데이터(c1)의 출처 메모
+  {
+    id: "m3",
+    text: "팀장 주간보고 시간순으로 썼다고 다시 쓰래 결론부터 쓰라고함 ㅠ",
+    createdAt: "2026-10-24T17:40",
+    status: "done",
+    result: {
+      cleaned: "팀장님: 주간보고를 시간순으로 써서 다시 쓰래. 결론부터 쓰라고 함.",
+      actions: [{ kind: "add_caution", label: "주의할 점 추가 · 주간보고는 결론(성과)부터", href: "/wiki/cautions#c1" }],
+    },
+  },
 ];

@@ -3,17 +3,19 @@
 import { useState } from "react";
 import Link from "next/link";
 import clsx from "clsx";
-import { BookOpen, CalendarPlus, HelpCircle, ListPlus, Loader2, Sparkles, Trash2 } from "lucide-react";
+import { BookOpen, CalendarPlus, HelpCircle, ListPlus, Loader2, ShieldAlert, Sparkles, Trash2 } from "lucide-react";
 import type { Memo, MemoAction, MemoActionKind } from "@/lib/memoTypes";
 import { fmt } from "@/lib/date";
 import { useWiki } from "@/components/wiki/store";
 import { addMemo, deleteMemo, useMemos } from "./store";
+import { ItemLink } from "@/components/item/ItemPeek";
 
 const ACTION_ICON: Record<MemoActionKind, typeof CalendarPlus> = {
   create_event: CalendarPlus,
   create_task: ListPlus,
   ask: HelpCircle,
   update_wiki: BookOpen,
+  add_caution: ShieldAlert,
 };
 
 const ACTION_TONE: Record<MemoActionKind, string> = {
@@ -21,6 +23,7 @@ const ACTION_TONE: Record<MemoActionKind, string> = {
   create_task: "text-[var(--kind-simple)]",
   ask: "text-info",
   update_wiki: "text-accent",
+  add_caution: "text-warn",
 };
 
 /** 메모 입력창 (메모 탭 상단 · 빠른 메모 공용) */
@@ -89,9 +92,16 @@ function ActionRow({ a }: { a: MemoAction }) {
       </span>
     </>
   );
+  // 항목으로 가는 링크는 사이드 패널로 연다 (저장된 예전 주소 /items/… 도 그대로 처리)
+  const itemId = a.href?.match(/^\/items\/([^/?#]+)$/)?.[1];
+  const rowCls = "flex gap-2 rounded-md px-2 py-1.5 text-[13.5px] hover:bg-sunken";
   return (
     <li>
-      {a.href ? (
+      {itemId ? (
+        <ItemLink id={decodeURIComponent(itemId)} className={rowCls}>
+          {inner}
+        </ItemLink>
+      ) : a.href ? (
         <Link href={a.href} className="flex gap-2 rounded-md px-2 py-1.5 text-[13.5px] hover:bg-sunken">
           {inner}
         </Link>

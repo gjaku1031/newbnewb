@@ -6,7 +6,7 @@
 export type MemoStatus = "processing" | "done";
 
 /** Claude가 메모를 보고 한 일 */
-export type MemoActionKind = "create_event" | "create_task" | "ask" | "update_wiki";
+export type MemoActionKind = "create_event" | "create_task" | "ask" | "update_wiki" | "add_caution";
 
 export interface MemoAction {
   kind: MemoActionKind;

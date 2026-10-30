@@ -4,13 +4,16 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import clsx from "clsx";
 import { Bot, Check, ChevronDown, ChevronRight, Loader2, MessageSquarePlus, X } from "lucide-react";
-import type { WikiPage } from "@/lib/types";
+import type { Source, WikiPage } from "@/lib/types";
+import { FileIcon, SourceTypeBadge, fileLabel } from "./badges";
+import { CautionBox } from "@/components/caution/CautionBox";
+import { cautionsForWiki, useCautions } from "@/lib/cautionStore";
 import type { Revision, RevisionStatus, WikiComment } from "@/lib/wikiTypes";
 import { fmt } from "@/lib/date";
 import { diffLines, diffStats } from "@/lib/diff";
 import { Markdown, extractHeadings } from "@/lib/markdown";
 import { Button } from "@/components/ui";
-import { useTitleOf } from "@/components/workspace/hooks";
+import { useSources, useTitleOf } from "@/components/workspace/hooks";
 import { DiffView } from "./DiffView";
 import { IssueBox } from "./IssueBox";
 import { OnThisPage } from "./OnThisPage";
@@ -106,6 +109,7 @@ export function WikiArticle({
 }) {
   const s = useWiki();
   const titleOf = useTitleOf();
+  const cautions = cautionsForWiki(useCautions(), base.slug);
   const wide = useWide();
   const page = effectivePage(s, base);
   const revs = revisionsOf(s, base.slug);
@@ -251,7 +255,9 @@ export function WikiArticle({
             </>
           )}
           <span>·</span>
-          <span>근거 {page.sourceIds.length}개</span>
+          <a href="#sources" className="hover:text-ink hover:underline">
+            근거 {page.sourceIds.length}개
+          </a>
           <span>·</span>
           <span>
             다음 복습 {fmt(page.review.nextReview, "M월 d일")} ({page.review.intervalDays}일마다)
@@ -304,6 +310,8 @@ export function WikiArticle({
           </div>
         ) : null}
 
+        <CautionBox list={cautions} className="mt-6" />
+
         {/* 본문 — 선택하면 주석, 문단에 마우스를 올리면 말풍선 */}
         <div
           ref={bodyRef}
@@ -331,6 +339,8 @@ export function WikiArticle({
             </button>
           )}
         </div>
+
+        <SourceList ids={page.sourceIds} />
 
         {!wide && <div className="mt-10">{panel}</div>}
 
@@ -360,6 +370,48 @@ export function WikiArticle({
         </button>
       )}
     </div>
+  );
+}
+
+/* 출처 신뢰도 순서: 공식 문서 > 상사 답변 > 동료 조언 > 메모 */
+const TRUST_ORDER: Source["type"][] = ["manual", "guideline", "boss_answer", "peer_advice", "note"];
+
+/** 이 페이지의 근거가 된 원본 문서 */
+function SourceList({ ids }: { ids: string[] }) {
+  const sources = useSources();
+  const list = ids
+    .map((id) => sources.find((s) => s.id === id))
+    .filter((s) => s !== undefined)
+    .sort((a, b) => TRUST_ORDER.indexOf(a.type) - TRUST_ORDER.indexOf(b.type));
+  if (list.length === 0) return null;
+  return (
+    <section id="sources" className="mt-12 scroll-mt-20 lg:scroll-mt-6">
+      <h2 className="flex items-center gap-2 text-[15px] font-semibold">
+        원본 문서 <span className="text-[13px] font-normal text-faint tabular">{list.length}</span>
+      </h2>
+      <ul className="mt-3 overflow-hidden rounded-xl border border-line bg-surface">
+        {list.map((s) => (
+          <li key={s.id} className="flex items-center gap-3 border-b border-line px-4 py-2.5 last:border-b-0">
+            <FileIcon type={s.fileType} />
+            <span className="min-w-0 flex-1">
+              {s.hasFile ? (
+                <a href={`/api/sources/${s.id}/file`} className="block truncate text-[13.5px] font-medium hover:text-accent-ink hover:underline">
+                  {s.title}
+                </a>
+              ) : (
+                <span className="block truncate text-[13.5px] font-medium">{s.title}</span>
+              )}
+              <span className="mt-0.5 flex items-center gap-1.5 text-[12px] text-faint">
+                <SourceTypeBadge type={s.type} />
+                <span>{fileLabel(s.fileType)}</span>
+                <span>·</span>
+                <span className="tabular">{fmt(s.addedAt, "yyyy. M. d.")}</span>
+              </span>
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 

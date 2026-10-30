@@ -6,18 +6,20 @@ import { listItems, listTags } from "./items";
 import { listMemos } from "./memos";
 import { latestBriefings, latestReschedule, listQuestions } from "./records";
 import { listWiki } from "./wiki";
+import { listCautions } from "./cautions";
 
 /** 화면 전체가 쓰는 데이터를 한 번에 */
 export async function loadWorkspace(db: Exec): Promise<WorkspaceSnapshot> {
   const version = Date.now();
-  const [items, tags, wiki, memos, questions, briefing, reschedule] = await Promise.all([
+  const [items, tags, wiki, memos, questions, cautions, briefing, reschedule] = await Promise.all([
     listItems(db),
     listTags(db),
     listWiki(db),
     listMemos(db),
     listQuestions(db),
+    listCautions(db),
     latestBriefings(db),
     latestReschedule(db),
   ]);
-  return { version, now: seoulNow(), items, tags, wiki, memos, questions, briefing, reschedule };
+  return { version, now: seoulNow(), items, tags, wiki, memos, questions, cautions, briefing, reschedule };
 }

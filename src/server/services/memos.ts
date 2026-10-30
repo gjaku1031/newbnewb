@@ -11,6 +11,7 @@ import type { Db, Exec } from "@/server/db/types";
 import { newId } from "@/server/ids";
 import { writeItem } from "./items";
 import { pageContent, runReview, submitRevisionTx } from "./wiki";
+import { newCaution, writeCaution } from "./cautions";
 
 export async function listMemos(db: Exec): Promise<Memo[]> {
   const rows = await db.select().from(memos).orderBy(desc(memos.at), desc(memos.createdAt));
@@ -39,7 +40,7 @@ export async function processMemo(db: Db, id: string, processor: MemoProcessor =
   const plan = await processor.process(memo.text, today);
 
   const revisionIds = await db.transaction(async (tx) => {
-    const { actions, revisionIds } = await applyPlan(tx, plan, today);
+    const { actions, revisionIds } = await applyPlan(tx, plan, today, id);
     await tx
       .update(memos)
       .set({ status: "done", result: { cleaned: plan.cleaned, actions } })
@@ -49,9 +50,23 @@ export async function processMemo(db: Db, id: string, processor: MemoProcessor =
   for (const rid of revisionIds) await runReview(db, rid);
 }
 
-async function applyPlan(tx: Exec, plan: MemoPlan, today: string) {
+async function applyPlan(tx: Exec, plan: MemoPlan, today: string, memoId: string) {
   const actions: MemoAction[] = [];
   const revisionIds: string[] = [];
+
+  // 지적·실수 → 주의할 점
+  for (const c of plan.cautions) {
+    const caution = newCaution({
+      point: c.point.slice(0, 500),
+      by: c.by,
+      source: { kind: "memo", id: memoId },
+      wikiRefs: c.wikiSlug ? [c.wikiSlug] : [],
+      tags: [],
+    });
+    await writeCaution(tx, caution);
+    actions.push({ kind: "add_caution", label: `주의할 점 추가 · ${c.point}`, href: `/wiki/cautions#${caution.id}` });
+  }
+
   const tagIds = new Set((await tx.select({ id: tags.id }).from(tags)).map((t) => t.id));
   const base = { subItems: [], wikiRefs: [], createdAt: today } satisfies Partial<Item>;
 

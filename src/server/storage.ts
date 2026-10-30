@@ -1,70 +1,55 @@
 import "server-only";
-import {
-  DeleteObjectCommand,
-  GetObjectCommand,
-  HeadBucketCommand,
-  PutObjectCommand,
-  S3Client,
-} from "@aws-sdk/client-s3";
 
 /**
- * Object Storage (S3 호환 API)
+ * Object Storage — 환경에 따라 두 가지 방식 중 하나를 쓴다.
  *
- * 로컬: compose.yaml의 RustFS  → S3_ENDPOINT=http://127.0.0.1:19000
- * 운영: OCI Object Storage     → S3_ENDPOINT=https://<namespace>.compat.objectstorage.<region>.oraclecloud.com
+ * 1) 운영(oci-prod): OCI SDK + 서버 인증(Instance Principal), 비밀키 없음
+ *    OCI_AUTH=instance_principal  OCI_REGION  OCI_NAMESPACE  OCI_BUCKET
+ *    (infra/oci/setup-object-storage.sh가 /srv/newb/object-storage.env로 만들어 둠)
+ *    OCI_AUTH=config_file 이면 ~/.oci/config(OCI_CONFIG_FILE, OCI_PROFILE)로 인증 — oci-dev에서 확인할 때
  *
- * S3_REGION             OCI는 리전 이름 (예: ap-tokyo-1)
- * S3_BUCKET             버킷 이름
- * S3_ACCESS_KEY_ID      OCI는 사용자의 "고객 비밀 키(Customer Secret Key)"
- * S3_SECRET_ACCESS_KEY
+ * 2) 로컬: S3 호환 API (compose.yaml의 RustFS)
+ *    S3_ENDPOINT  S3_REGION  S3_BUCKET  S3_ACCESS_KEY_ID  S3_SECRET_ACCESS_KEY
  */
-function createClient() {
-  const endpoint = process.env.S3_ENDPOINT;
-  const accessKeyId = process.env.S3_ACCESS_KEY_ID;
-  const secretAccessKey = process.env.S3_SECRET_ACCESS_KEY;
-  if (!endpoint || !accessKeyId || !secretAccessKey) {
-    throw new Error("S3_ENDPOINT, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY가 필요합니다");
+export interface ObjectStore {
+  readonly kind: "oci" | "s3";
+  check(signal?: AbortSignal): Promise<void>;
+  put(key: string, body: Uint8Array, contentType: string): Promise<void>;
+  get(key: string): Promise<Uint8Array>;
+  delete(key: string): Promise<void>;
+}
+
+const cache = globalThis as unknown as { newbStore?: Promise<ObjectStore> };
+
+function store(): Promise<ObjectStore> {
+  return (cache.newbStore ??= createStore().catch((error) => {
+    cache.newbStore = undefined; // 다음 요청에서 다시 시도
+    throw error;
+  }));
+}
+
+async function createStore(): Promise<ObjectStore> {
+  if (process.env.OCI_AUTH) {
+    const { createOciStore } = await import("./storage-oci");
+    return createOciStore(process.env);
   }
-  return new S3Client({
-    endpoint,
-    region: process.env.S3_REGION ?? "us-east-1",
-    credentials: { accessKeyId, secretAccessKey },
-    // OCI·RustFS 모두 버킷을 경로에 넣는 방식만 지원
-    forcePathStyle: true,
-    // SDK 기본 CRC 체크섬 헤더를 OCI가 받지 않아 필요할 때만 보냄
-    requestChecksumCalculation: "WHEN_REQUIRED",
-    responseChecksumValidation: "WHEN_REQUIRED",
-  });
-}
-
-const cache = globalThis as unknown as { newbS3?: S3Client };
-
-function client() {
-  return (cache.newbS3 ??= createClient());
-}
-
-function bucket() {
-  const name = process.env.S3_BUCKET;
-  if (!name) throw new Error("S3_BUCKET이 설정되지 않았습니다");
-  return name;
+  const { createS3Store } = await import("./storage-s3");
+  return createS3Store(process.env);
 }
 
 export async function checkBucket(signal?: AbortSignal) {
-  await client().send(new HeadBucketCommand({ Bucket: bucket() }), { abortSignal: signal });
+  await (await store()).check(signal);
 }
 
 export async function putObject(key: string, body: Uint8Array | string, contentType: string) {
-  await client().send(
-    new PutObjectCommand({ Bucket: bucket(), Key: key, Body: body, ContentType: contentType }),
-  );
+  const bytes = typeof body === "string" ? new TextEncoder().encode(body) : body;
+  await (await store()).put(key, bytes, contentType);
 }
 
 export async function getObjectBytes(key: string) {
-  const res = await client().send(new GetObjectCommand({ Bucket: bucket(), Key: key }));
-  if (!res.Body) throw new Error(`빈 객체: ${key}`);
-  return res.Body.transformToByteArray();
+  return (await store()).get(key);
 }
 
 export async function deleteObject(key: string) {
-  await client().send(new DeleteObjectCommand({ Bucket: bucket(), Key: key }));
+  await (await store()).delete(key);
 }

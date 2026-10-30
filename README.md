@@ -82,7 +82,8 @@
 - React 19, TypeScript, Tailwind CSS v4, Pretendard
 - @dnd-kit (캘린더 드래그), date-fns, lucide-react
 - [Agentation](https://www.agentation.com/) — 화면에 주석을 달아 Claude Code로 QA (로그인 사용자만, `/api/agentation` 프록시)
-- Drizzle ORM + mysql2, zod(서버 액션 입력 검증), AWS S3 SDK (OCI Object Storage S3 호환 API), Docker(Next.js standalone)
+- Drizzle ORM + mysql2, zod(서버 액션 입력 검증), Docker(Next.js standalone)
+- 파일 저장: 운영은 OCI SDK(서버 인증, 비밀키 없음), 로컬은 AWS S3 SDK(RustFS)
 - 테스트: Vitest + Testcontainers(MySQL)
 - 예정: Passkey(WebAuthn), MCP 서버(`/api/mcp`), oci-prod 배포(arm64 + Caddy)
 
@@ -101,14 +102,14 @@ npm run dev          # http://localhost:3000
 
 | 서비스 | 주소 | 운영에서 대응 |
 |---|---|---|
-| MySQL 26.7.0 | `127.0.0.1:23306` (newb / newb_dev) | OCI HeatWave MySQL (`ken-blog-mysql` 안의 `newb` DB) |
-| S3 (RustFS) | API `127.0.0.1:19000`, 콘솔 `127.0.0.1:19001` | OCI Object Storage (S3 호환 API) |
+| MySQL 26.10.0 | `127.0.0.1:23306` (newb / newb_dev) | 공용 MySQL `ken-prod` 안의 `newb` DB (TLS 필수) |
+| S3 (RustFS) | API `127.0.0.1:19000`, 콘솔 `127.0.0.1:19001` | OCI Object Storage `newb-files` (OCI SDK·서버 인증) |
 
 - `docker compose --profile app up -d --build` 하면 운영과 같은 앱 이미지까지 띄웁니다 (마이그레이션 → 앱 순서).
 - 연결 확인: `curl localhost:3000/api/health` → `{"status":"ok","checks":{"db":"ok","storage":"ok"}}`
 - 스키마 변경: `src/server/db/schema.ts` 수정 → `npm run db:generate` → `npm run db:migrate`
 - 초기화: `docker compose down -v` (데이터까지 삭제)
-- 테스트: `npm test` — 운영과 같은 MySQL 26.7.0을 Testcontainers로 띄워 저장·위키 검토·메모 처리·재배치를 검증 (Docker 필요)
+- 테스트: `npm test` — 운영과 같은 MySQL 26.10.0을 Testcontainers로 띄워 저장·위키 검토·메모 처리·재배치를 검증 (Docker 필요)
 
 ### 데이터 흐름
 
@@ -125,6 +126,18 @@ npm run dev          # http://localhost:3000
 - 로그인은 아직 임시(`src/lib/auth.ts`): `next dev`는 로그인된 상태, 운영 빌드는 항상 비로그인이라 **데이터가 하나도 나가지 않습니다** (Passkey 붙이면 교체).
 - "오늘"은 한국 시간 기준이며, 서버가 스냅샷에 담아 보낸 시각으로 맞춥니다 (`src/lib/today.ts`).
 - 사람 이름·내부 메모·자료 제공자는 DB에만 있고 화면으로 보내지 않습니다 (Claude 답변용).
+
+### 운영 연결 (oci-prod)
+
+앱 컨테이너는 `infra/oci`가 만든 두 파일을 `env_file`로 읽습니다.
+
+| 파일 | 앱이 쓰는 값 |
+|---|---|
+| `/srv/newb/newb.env` | `DATABASE_URL` (`…?ssl=true` → TLS 암호화. 사설 CA로 검증하려면 `DATABASE_SSL_CA_FILE` 추가) |
+| `/srv/newb/object-storage.env` | `OCI_AUTH=instance_principal` `OCI_REGION` `OCI_NAMESPACE` `OCI_BUCKET` → OCI SDK로 버킷 접근 |
+
+- 마이그레이션: 같은 이미지로 `node migrate.cjs` (배포 전에 한 번)
+- 시드(`db:seed`)는 개발용이라 운영 DB에는 넣지 않습니다.
 
 다른 기기(같은 Tailscale 망 등)에서 개발 서버에 접속하려면 `.env.local`에 허용할 주소를 적습니다.
 
@@ -170,7 +183,7 @@ src/
 │  ├─ actions.ts           서버 액션 (로그인 확인 → 검증 → 서비스)
 │  ├─ validation.ts        입력 검증 (zod)
 │  ├─ seed.ts              목데이터 시드
-│  └─ storage.ts           Object Storage(S3) 클라이언트
+│  └─ storage*.ts          Object Storage — OCI SDK(운영) / S3(로컬)
 └─ mocks/                  목데이터 — 시드·테스트에서만 사용 (wikiInternal.ts는 server-only)
 drizzle/                   DB 마이그레이션 SQL
 scripts/                   마이그레이션·시드 실행기

@@ -14,6 +14,7 @@ import { mutate, refresh } from "@/components/workspace/store";
 import * as actions from "@/server/actions";
 import { displayKind } from "@/lib/items";
 import { TODAY } from "@/lib/today";
+import { ItemLink } from "@/components/item/ItemPeek";
 
 const CLAUDE_PROMPT = `newb의 재배치 제안(r1)을 불러와서 같이 상의하자. 법인카드 정리를 월요일로 미루는 게 괜찮은지 봐줘.`;
 
@@ -169,9 +170,9 @@ function ItemRow({
             {q.priority && <PriorityBadge p={q.priority} />}
             <KindTag kind={displayKind(q)} />
           </div>
-          <Link href={`/items/${q.id}`} className="text-[14.5px] font-semibold hover:underline">
+          <ItemLink id={q.id} className="text-[14.5px] font-semibold hover:underline">
             {q.title}
-          </Link>
+          </ItemLink>
         </div>
         <div className="flex shrink-0 rounded-lg bg-sunken p-0.5">
           <button

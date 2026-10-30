@@ -25,7 +25,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="ko" className="h-full antialiased">
       <body className="min-h-full">
-        {/* 로그인 확인 + DB에서 작업공간을 읽는 동안 뼈대를 보여준다 */}
+        {/* 로그인 확인 + DB에서 작업공간을 읽는 동안 뼈대를 보여준다 (항목 사이드 패널·빠른 메모도 그 안에) */}
         <Suspense fallback={<PageSkeleton />}>
           <WorkspaceGate>{children}</WorkspaceGate>
         </Suspense>

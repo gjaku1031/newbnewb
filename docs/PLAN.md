@@ -135,7 +135,7 @@ LLM 하나에 "확실하냐"고 묻는 대신, **판정 근거를 구조화된 �
 
 - 우리 앱이 **MCP 서버**를 제공 → 사용자가 Claude Desktop에 커스텀 커넥터로 등록
 - MCP 도구 예시:
-  - `get_task_brief(task_id)`: 작업 지침·회사 양식·위키 근거 전달
+  - `get_task_brief(task_id)`: 작업 지침·회사 양식·위키 근거·**주의할 점** 전달
   - `get_guidelines(topic)`: 관련 가이드라인 조회
   - ~~`submit_draft`~~ (1차 QA에서 제외 — 결과물은 Claude 채팅에서 확인)
 - 앱에서 **검증**: 지침 대비 체크리스트 자동 점검
@@ -147,6 +147,23 @@ LLM 하나에 "확실하냐"고 묻는 대신, **판정 근거를 구조화된 �
 - **메모 탭**(`/memos`): 내 원문 메모 ↔ Claude 정리본(오타·문장 정리) + 반영한 것 목록(링크, 위키 검토 상태)
 - 처리기는 인터페이스(`MemoProcessor`)로 분리 — 목업은 규칙 기반, 실제는 Claude(MCP)
 - 데이터: `memos` (원문, 작성 시각, 상태, 정리본, 반영 내역 json)
+
+### F9. 주의할 점 (실수·지적 노트, 2026-10-30)
+> 신입은 실수에 민감하다. 지적받은 것·실수를 모아 두고, **비슷한 일을 할 때 먼저 알려준다.** 태그는 항목에만 붙고 스스로 알려주지 못해서 별도 기능으로 둔다.
+
+- **모으는 곳**
+  - 메모: "지적·반려·다시 쓰래·빠뜨림" 같은 말이 있으면 Claude가 주의할 점으로 만든다 (메모 탭에 '주의할 점 추가'로 기록)
+  - 질문 기록: 상세 화면의 **주의할 점으로 남기기** (알아온 답 + 근거 위키 연결)
+  - 위키 > **주의할 점**(`/wiki/cautions`)에서 직접 추가
+- **담는 것**: 주의할 점 한 줄(맞는 방법 중심), 무엇이 문제였는지, 지적한 사람의 **직책만**(이름 X), 관련 위키·태그, 출처
+- **알려주는 때** — 관련 위키나 태그가 겹치는 일에
+  - 항목 패널 맨 위 '주의할 점' 상자
+  - Claude 작업 지침: `get_task_brief`가 주의할 점을 함께 전달 → Claude가 같은 실수를 피해서 작업
+  - 대시보드 오늘 할 일에 '주의 N' 표시, 어제 정리에 **그날 생긴 주의할 점**
+  - 위키 페이지 본문 위에 그 페이지에 걸린 주의할 점
+- **복습**: 위키와 같은 'N일마다' + **다시 봤어요**, 충분히 익히면 **익혔어요** → 더는 알리지 않음(익힌 것 목록, 다시 알리기 가능)
+- 이름·말투: "실수 목록"이 아니라 "주의할 점". 횟수·점수로 압박하지 않는다
+- 데이터: `cautions` (point, wrong, by_role, source_kind/source_id, created_at, next_review, interval_days, archived) + `caution_wiki`, `caution_tags`
 
 ### F7. 대시보드 (아침·저녁 브리핑 통합 — 2차 QA)
 - 별도 브리핑 화면 없음. **아침 브리핑 = 대시보드(`/`)**, **저녁 브리핑 = 다음 날 대시보드의 "어제 정리"**
@@ -175,6 +192,7 @@ people         사람 (이름 + 직책) — 화면엔 직책만, 이름은 Claud
 reschedule_proposals  재배치 제안 + 승인 상태
 daily_digests  대시보드용 하루 정리 (전날 저녁 생성)
 feedback       답변/판정에 대한 사용자 피드백
+cautions       주의할 점 (point, wrong, by_role, source, next_review, interval_days, archived) / caution_wiki, caution_tags
 ```
 
 ---
@@ -270,6 +288,11 @@ interface DecisionModel {
 - Docker 사용 중, 기존 서비스가 Caddy로 **80/443을 사용** 중 (같은 Caddy에 사이트 블록 추가 예정)
 - 배포 방식: Next.js `standalone` 이미지를 **arm64로 빌드** → 컨테이너 1개 추가 (127.0.0.1 바인딩) → 기존 Caddy에 사이트 블록 추가
 - 주의: 서버에서 `next build`는 메모리를 많이 씀 → 로컬/CI에서 arm64 이미지 빌드 후 전송 권장
+
+### 8-2-1. DB·파일 저장 (Always Free, 2026-10-30)
+- MySQL: 새 서버 없이 공용 `ken-prod`(MySQL.Free 26.10.0, 10.0.0.47 — 여러 앱이 써서 ken-blog-mysql에서 이름 변경, 10-30 관리자 `kenadmin`으로 재생성) **안에** `newb` DB + 전용 사용자 `newb`(TLS 필수, newb DB만, oci-prod에서만) — **생성 완료**
+- 파일: Object Storage 버킷 `newb-files`(비공개) + **서버 인증**(동적 그룹 newb-prod = oci-prod만, 정책은 이 버킷만) — 비밀키 없음 — **생성 완료**
+- 세팅 스크립트·비밀값 위치: [infra/oci/README.md](../infra/oci/README.md) — MySQL 관리자 비밀번호는 저장돼 있지 않아 사용자가 직접 입력
 
 ### 8-3. 화면 QA용 주석 (Agentation)
 - 앱 오른쪽 아래 Agentation 툴바로 화면 요소에 주석을 달면 Claude Code가 MCP(`agentation`)로 바로 읽음

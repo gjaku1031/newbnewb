@@ -14,7 +14,7 @@ let container: StartedMySqlContainer | undefined;
 
 /** 운영(OCI MySQL.Free)과 같은 버전의 격리 MySQL을 띄우고 마이그레이션까지 적용 */
 export async function setup(project: TestProject) {
-  container = await new MySqlContainer("mysql:26.7.0").withDatabase("newb_test").start();
+  container = await new MySqlContainer("mysql:26.10.0").withDatabase("newb_test").start();
   const url = container.getConnectionUri();
   const conn = await mysql.createConnection({ uri: url, multipleStatements: true });
   await migrate(drizzle({ client: conn }), { migrationsFolder: "drizzle" });

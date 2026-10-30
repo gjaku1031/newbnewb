@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Bot, BookOpen, Pencil } from "lucide-react";
+import { Bot, BookOpen, Pencil, ShieldAlert } from "lucide-react";
+import type { Caution } from "@/lib/types";
 import { Card, CardTitle, Button } from "@/components/ui";
 import { CopyButton } from "@/components/CopyButton";
 import { useWikiPages } from "@/components/workspace/hooks";
@@ -16,11 +17,13 @@ export function ClaudeBrief({
   itemId,
   brief,
   guidelines,
+  cautions = [],
   onSave,
 }: {
   itemId: string;
   brief?: string;
   guidelines: string[];
+  cautions?: Caution[];
   onSave: (brief: string | undefined) => void;
 }) {
   const [editing, setEditing] = useState(false);
@@ -94,6 +97,22 @@ export function ClaudeBrief({
                   {w.title}
                 </Link>
               ))}
+            </div>
+          )}
+
+          {cautions.length > 0 && (
+            <div>
+              <span className="flex items-center gap-1 text-[12.5px] text-muted">
+                <ShieldAlert className="size-3.5" /> 함께 전달되는 주의할 점
+              </span>
+              <ul className="mt-1.5 space-y-1">
+                {cautions.map((c) => (
+                  <li key={c.id} className="flex gap-2 text-[13px] leading-snug">
+                    <span className="mt-[7px] size-1 shrink-0 rounded-full bg-warn" />
+                    {c.point}
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
 

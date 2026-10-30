@@ -4,9 +4,10 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import clsx from "clsx";
-import { ChevronDown, ChevronRight, Home, Menu, Search, X } from "lucide-react";
+import { ChevronDown, ChevronRight, Home, Menu, Search, ShieldAlert, X } from "lucide-react";
 import { navData } from "./structure";
 import { pendingRevisions, useWiki } from "./store";
+import { isDue, useCautions } from "@/lib/cautionStore";
 
 /** Next.js 문서 스타일 왼쪽 내비게이션 (검색 + 접는 장 + 페이지 트리) */
 function NavTree({ onNavigate }: { onNavigate?: () => void }) {
@@ -14,6 +15,7 @@ function NavTree({ onNavigate }: { onNavigate?: () => void }) {
   const current = pathname.startsWith("/wiki/") ? decodeURIComponent(pathname.slice(6)) : null;
   const wiki = useWiki();
   const chapters = navData(wiki.pages);
+  const dueCautions = useCautions().filter(isDue).length;
   const pending = new Set(pendingRevisions(wiki).map((r) => r.slug));
   const [query, setQuery] = useState("");
   const [closed, setClosed] = useState<Set<string>>(new Set());
@@ -53,6 +55,22 @@ function NavTree({ onNavigate }: { onNavigate?: () => void }) {
       >
         <Home className="size-4" />
         위키 홈
+      </Link>
+      <Link
+        href="/wiki/cautions"
+        onClick={onNavigate}
+        className={clsx(
+          "flex items-center gap-2 rounded-md px-2 py-1.5",
+          pathname === "/wiki/cautions" ? "font-semibold text-accent-ink" : "text-muted hover:text-ink",
+        )}
+      >
+        <ShieldAlert className="size-4" />
+        <span className="flex-1">주의할 점</span>
+        {dueCautions > 0 && (
+          <span className="rounded-full bg-warn-soft px-1.5 text-[11.5px] font-semibold text-warn tabular">
+            {dueCautions}
+          </span>
+        )}
       </Link>
 
       <div className="mt-3 space-y-4">

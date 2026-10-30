@@ -26,6 +26,13 @@ export interface PlannedWiki {
   line: string;
 }
 
+/** 지적받은 것·실수 → 주의할 점 */
+export interface PlannedCaution {
+  point: string;
+  by?: string;
+  wikiSlug?: string;
+}
+
 export interface MemoPlan {
   cleaned: string;
   events: PlannedEvent[];
@@ -33,6 +40,7 @@ export interface MemoPlan {
   /** 할 일에 붙지 못한 알아올 것 */
   asks: string[];
   wiki: PlannedWiki[];
+  cautions: PlannedCaution[];
 }
 
 export interface MemoProcessor {
@@ -88,6 +96,7 @@ const WIKI_TOPICS: [RegExp, string][] = [
   [/(메일|회신)/, "email-etiquette"],
   [/(경비|ERP|계정과목)/, "erp-expense"],
 ];
+const MISTAKE = /(지적|혼났|혼남|실수|틀렸|틀림|반려|다시 (써|해|하)|주의하래|하지 말래|하지 말라|빠뜨|까먹)/;
 const FACT = /(래|한대|라고 함|해야 ?(함|돼|된대)|이래|바뀐)/;
 
 function fixTypos(text: string) {
@@ -131,7 +140,7 @@ export class RuleMemoProcessor implements MemoProcessor {
 
   async process(text: string, today: string): Promise<MemoPlan> {
     const cleaned = toSentences(fixTypos(text));
-    const plan: MemoPlan = { cleaned, events: [], tasks: [], asks: [], wiki: [] };
+    const plan: MemoPlan = { cleaned, events: [], tasks: [], asks: [], wiki: [], cautions: [] };
     const role = cleaned.match(ROLE)?.[1];
     const date = findDate(cleaned, today);
     const time = findTime(cleaned);
@@ -154,6 +163,13 @@ export class RuleMemoProcessor implements MemoProcessor {
       });
     } else if (UNSURE.test(cleaned)) {
       plan.asks.push(`${ev ?? "메모 내용"} 관련해서 모르는 부분 ${role ?? "담당자"}께 확인`);
+    }
+
+    // 지적·실수 → 주의할 점 (실제로는 Claude가 '맞는 방법' 한 줄로 요약)
+    if (MISTAKE.test(cleaned)) {
+      const wikiSlug = WIKI_TOPICS.find(([re]) => re.test(cleaned))?.[1];
+      plan.cautions.push({ point: cleaned, by: role, wikiSlug });
+      return plan;
     }
 
     if (FACT.test(cleaned)) {
