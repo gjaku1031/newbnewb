@@ -11,13 +11,14 @@
 # 비밀값은 화면·명령줄·git에 남기지 않는다. 여러 번 실행해도 안전.
 #
 # 사용:  bash infra/oci/bootstrap.sh
-#        ADMIN_USER=다른이름 bash infra/oci/bootstrap.sh   (관리자 계정 이름이 admin이 아닐 때)
+#        ADMIN_USER=다른이름 bash infra/oci/bootstrap.sh   (관리자 계정 이름이 admin이 아닐 때 — 이름은 바꿀 수 없고 로그인에만 씀)
 set -euo pipefail
 cd "$(dirname "$0")"
 
 CONF="$HOME/.config/newb"
 ADMIN_ENV="$CONF/mysql-admin.env"
 DB_SYSTEM_NAME=${DB_SYSTEM_NAME:-ken-blog-mysql}
+ADMIN_USER_GIVEN=${ADMIN_USER:-}
 ADMIN_USER=${ADMIN_USER:-admin}
 PROD=${PROD:-oci-prod}
 export SUPPRESS_LABEL_WARNING=True
@@ -45,14 +46,23 @@ while True:
     if any(c.isdigit() for c in p) and any(c.islower() for c in p) and any(c.isupper() for c in p) and any(c in sp for c in p):
         print(p); break')
 
-  echo "▶ ${DB_SYSTEM_NAME} 관리자(${ADMIN_USER}) 비밀번호 재설정"
-  # 비밀번호를 명령줄에 넣지 않도록 JSON 파일로 전달
+  echo "▶ ${DB_SYSTEM_NAME} 관리자 비밀번호 재설정 (계정 이름은 그대로)"
+  # 비밀번호를 명령줄에 넣지 않도록 JSON 파일로 전달.
+  # OCI는 관리자 이름 변경을 지원하지 않고, 이름·비밀번호를 한 번에 바꿀 수도 없어서 비밀번호만 보낸다.
   REQ=$(mktemp)
-  trap 'rm -f "$REQ"' EXIT
-  python3 -I -c 'import json,sys; print(json.dumps({"dbSystemId":sys.argv[1],"adminUsername":sys.argv[2],"adminPassword":sys.argv[3]}))' \
-    "$DB_ID" "$ADMIN_USER" "$PW" >"$REQ"
-  oci mysql db-system update --from-json "file://$REQ" --force >/dev/null
-  rm -f "$REQ"
+  ERR=$(mktemp)
+  trap 'rm -f "$REQ" "$ERR"' EXIT
+  python3 -I -c 'import json,sys; print(json.dumps({"dbSystemId":sys.argv[1],"adminPassword":sys.argv[2]}))' \
+    "$DB_ID" "$PW" >"$REQ"
+  if ! oci mysql db-system update --from-json "file://$REQ" --force >/dev/null 2>"$ERR"; then
+    # OCI 오류 메시지가 보낸 값을 그대로 되돌려주므로 비밀번호를 가리고 출력
+    PW="$PW" python3 -I -c '
+import os, re, sys
+t = open(sys.argv[1]).read().replace(os.environ["PW"], "<가림>")
+print(re.sub(r"value = \{[^}]*\}", "value = {<가림>}", t), file=sys.stderr)' "$ERR"
+    exit 1
+  fi
+  rm -f "$REQ" "$ERR"
 
   printf 'MYSQL_ADMIN_USER=%s\nMYSQL_ADMIN_PASSWORD=%s\nMYSQL_HOST=10.0.0.47\nMYSQL_PORT=3306\n' "$ADMIN_USER" "$PW" >"$ADMIN_ENV"
   chmod 600 "$ADMIN_ENV"
@@ -74,6 +84,12 @@ fi
 echo "▶ ${PROD}: newb DB · 전용 계정"
 # shellcheck disable=SC1090
 . "$ADMIN_ENV"
+# 실행할 때 ADMIN_USER를 직접 줬으면 그 이름으로 로그인하고 파일도 갱신
+if [ -n "$ADMIN_USER_GIVEN" ] && [ "$ADMIN_USER_GIVEN" != "$MYSQL_ADMIN_USER" ]; then
+  MYSQL_ADMIN_USER=$ADMIN_USER_GIVEN
+  sed -i "s/^MYSQL_ADMIN_USER=.*/MYSQL_ADMIN_USER=${MYSQL_ADMIN_USER}/" "$ADMIN_ENV"
+  echo "✓ 관리자 계정 이름 → ${MYSQL_ADMIN_USER}"
+fi
 scp -q setup-mysql.sh "${PROD}:/tmp/newb-setup-mysql.sh"
 # 관리자 정보는 표준입력으로만 넘김 (원격 명령줄에 안 남음)
 printf '%s\n%s\n' "$MYSQL_ADMIN_USER" "$MYSQL_ADMIN_PASSWORD" |
