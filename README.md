@@ -82,14 +82,30 @@
 - React 19, TypeScript, Tailwind CSS v4, Pretendard
 - @dnd-kit (캘린더 드래그), date-fns, lucide-react
 - [Agentation](https://www.agentation.com/) — 화면에 주석을 달아 Claude Code로 QA (로그인 사용자만, `/api/agentation` 프록시)
-- 예정: OCI HeatWave MySQL, Passkey(WebAuthn), MCP 서버(`/api/mcp`), Docker(arm64) + Caddy 배포
+- Drizzle ORM + mysql2, AWS S3 SDK (OCI Object Storage S3 호환 API), Docker(Next.js standalone)
+- 예정: Passkey(WebAuthn), MCP 서버(`/api/mcp`), oci-prod 배포(arm64 + Caddy)
 
 ## 시작하기
 
 ```bash
 npm install
+cp .env.example .env.local
+npm run infra:up     # MySQL + S3(RustFS) + 버킷 생성 (Docker)
+npm run db:migrate   # 테이블 생성
 npm run dev          # http://localhost:3000
 ```
+
+### 로컬 인프라 (Docker)
+
+| 서비스 | 주소 | 운영에서 대응 |
+|---|---|---|
+| MySQL 26.7.0 | `127.0.0.1:23306` (newb / newb_dev) | OCI HeatWave MySQL (`ken-blog-mysql` 안의 `newb` DB) |
+| S3 (RustFS) | API `127.0.0.1:19000`, 콘솔 `127.0.0.1:19001` | OCI Object Storage (S3 호환 API) |
+
+- `docker compose --profile app up -d --build` 하면 운영과 같은 앱 이미지까지 띄웁니다 (마이그레이션 → 앱 순서).
+- 연결 확인: `curl localhost:3000/api/health` → `{"status":"ok","checks":{"db":"ok","storage":"ok"}}`
+- 스키마 변경: `src/server/db/schema.ts` 수정 → `npm run db:generate` → `npm run db:migrate`
+- 초기화: `docker compose down -v` (데이터까지 삭제)
 
 다른 기기(같은 Tailscale 망 등)에서 개발 서버에 접속하려면 `.env.local`에 허용할 주소를 적습니다.
 
@@ -113,7 +129,7 @@ claude mcp add agentation -- npx -y agentation-mcp server
 ```
 src/
 ├─ app/                    라우트 (오늘, tasks, wiki, memos, questions, items/[id], reschedule, settings)
-│  └─ api/                 agentation 프록시, auth/me
+│  └─ api/                 agentation 프록시, auth/me, health
 ├─ components/
 │  ├─ calendar/            작업 화면 — 월 그리드, 데이터베이스 표, 필터 바, 상세 패널
 │  ├─ dashboard/           오늘 대시보드
@@ -128,7 +144,13 @@ src/
 │  ├─ wikiEditor.ts        주석 → 문서 수정 인터페이스 (WikiEditor)
 │  ├─ memoProcessor.ts     메모 처리기 인터페이스 (MemoProcessor)
 │  └─ diff.ts              줄 단위 diff
+├─ server/                 서버 전용 (server-only)
+│  ├─ db/                  Drizzle 스키마 · MySQL 연결
+│  └─ storage.ts           Object Storage(S3) 클라이언트
 └─ mocks/                  목데이터 (wikiInternal.ts는 server-only)
+drizzle/                   DB 마이그레이션 SQL
+scripts/migrate.mjs        마이그레이션 실행기
+compose.yaml · Dockerfile  로컬 인프라 · 앱 이미지
 docs/PLAN.md               기획·결정 기록
 ```
 
@@ -136,6 +158,7 @@ docs/PLAN.md               기획·결정 기록
 
 - [x] 웹 프론트 목업 (대시보드, 작업, 위키, 메모, 질문 기록, 재배치, 설정)
 - [x] QA 반영: 항목 통합 모델, 캘린더/데이터베이스 보기, 위키 주석 반영 흐름, 빠른 메모
+- [x] 인프라: 로컬 Docker(MySQL·S3), Drizzle 마이그레이션, 앱 이미지
 - [ ] 백엔드: MySQL 스키마, Route Handlers, 서버 저장
 - [ ] Passkey 로그인 (1인용)
 - [ ] MCP 서버 + Claude Desktop 커스텀 커넥터 (`ask_newb`, `get_task_brief`, `get_guidelines`, `add_to_wiki`)

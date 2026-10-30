@@ -1,0 +1,103 @@
+# 로컬 개발 인프라
+#   docker compose up -d                       MySQL + S3(RustFS) + 버킷 생성
+#   docker compose --profile app up -d --build 앱 이미지까지 (마이그레이션 → 앱)
+# 운영은 OCI HeatWave MySQL + OCI Object Storage를 쓰고, 이 파일은 쓰지 않는다.
+name: newb
+
+x-db-url: &db-url mysql://${DB_USER:-newb}:${DB_PASSWORD:-newb_dev}@mysql:3306/newb
+x-s3-env: &s3-env
+  S3_ENDPOINT: http://s3:9000
+  S3_REGION: ap-tokyo-1
+  S3_BUCKET: ${S3_BUCKET:-newb-dev}
+  S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-newb_dev}
+  S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-newb_dev_secret}
+
+services:
+  mysql:
+    # OCI의 ken-blog-mysql(MySQL.Free)과 같은 버전
+    image: mysql:26.7.0
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-newb_root_dev}
+      MYSQL_DATABASE: newb
+      MYSQL_USER: ${DB_USER:-newb}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-newb_dev}
+    ports:
+      - "127.0.0.1:${DB_PORT:-23306}:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u$$MYSQL_USER -p$$MYSQL_PASSWORD --silent"]
+      interval: 3s
+      timeout: 3s
+      retries: 40
+      start_period: 10s
+
+  s3:
+    # S3 호환 스토리지 (OCI Object Storage 대용)
+    image: rustfs/rustfs:1.0.3
+    environment:
+      RUSTFS_ACCESS_KEY: ${S3_ACCESS_KEY_ID:-newb_dev}
+      RUSTFS_SECRET_KEY: ${S3_SECRET_ACCESS_KEY:-newb_dev_secret}
+      RUSTFS_CONSOLE_ENABLE: "true"
+    ports:
+      - "127.0.0.1:${S3_PORT:-19000}:9000" # S3 API
+      - "127.0.0.1:${S3_CONSOLE_PORT:-19001}:9001" # 웹 콘솔
+    volumes:
+      - s3-data:/data
+
+  # 버킷이 없으면 만들고 종료
+  s3-init:
+    image: rclone/rclone:1.75.2
+    depends_on:
+      - s3
+    environment:
+      RCLONE_CONFIG_S3_TYPE: s3
+      RCLONE_CONFIG_S3_PROVIDER: Other
+      RCLONE_CONFIG_S3_ENDPOINT: http://s3:9000
+      RCLONE_CONFIG_S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-newb_dev}
+      RCLONE_CONFIG_S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-newb_dev_secret}
+      RCLONE_CONFIG_S3_FORCE_PATH_STYLE: "true"
+      BUCKET: ${S3_BUCKET:-newb-dev}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        for i in $$(seq 1 30); do rclone lsd s3: >/dev/null 2>&1 && break; sleep 1; done
+        rclone mkdir "s3:$$BUCKET" && echo "bucket ready: $$BUCKET"
+    restart: "no"
+
+  migrate:
+    profiles: [app]
+    image: newb-app:local
+    build: .
+    command: ["node", "migrate.cjs"]
+    environment:
+      DATABASE_URL: *db-url
+    depends_on:
+      mysql:
+        condition: service_healthy
+    restart: "no"
+
+  app:
+    profiles: [app]
+    image: newb-app:local
+    build: .
+    environment:
+      DATABASE_URL: *db-url
+      <<: *s3-env
+    ports:
+      - "127.0.0.1:${APP_PORT:-3000}:3000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      s3-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/health >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  mysql-data:
+  s3-data:
