@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
 import clsx from "clsx";
 import { ThumbsDown, ThumbsUp } from "lucide-react";
 
-export function FeedbackBar({ initial }: { initial?: "up" | "down" }) {
-  const [value, setValue] = useState(initial);
+import { setFeedback } from "./actions";
+
+export function FeedbackBar({ questionId, value }: { questionId: string; value?: "up" | "down" }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-surface px-5 py-3.5 shadow-card">
       <div className="flex items-center gap-3">
@@ -18,7 +18,7 @@ export function FeedbackBar({ initial }: { initial?: "up" | "down" }) {
               <button
                 key={v}
                 aria-label={v === "up" ? "맞았어요" : "틀렸어요"}
-                onClick={() => setValue(active ? undefined : v)}
+                onClick={() => setFeedback(questionId, active ? undefined : v)}
                 className={clsx(
                   "grid size-8 place-items-center rounded-lg border transition-colors",
                   active

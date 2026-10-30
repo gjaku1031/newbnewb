@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Bot, BookOpen, Pencil } from "lucide-react";
 import { Card, CardTitle, Button } from "@/components/ui";
 import { CopyButton } from "@/components/CopyButton";
-import { getWikiPage } from "@/mocks/wiki";
+import { useWikiPages } from "@/components/workspace/hooks";
 
 /**
  * 할 일의 Claude 작업 지침 (편집 가능).
@@ -26,7 +26,8 @@ export function ClaudeBrief({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(brief ?? "");
   const startPrompt = `newb 항목 ${itemId} 지침대로 작업해줘. 작성하면서 어디를 왜 이렇게 썼는지 따라읽기로 설명해줘.`;
-  const wikis = guidelines.map(getWikiPage).filter((p) => p !== undefined);
+  const wikiPages = useWikiPages();
+  const wikis = guidelines.flatMap((slug) => wikiPages.filter((p) => p.slug === slug));
 
   const open = () => {
     setDraft(brief ?? "");

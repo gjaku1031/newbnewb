@@ -7,8 +7,8 @@ import type { Item, Priority, SubItem } from "@/lib/types";
 import { PRIORITY_ORDER, STATUSES, statusColor, statusLabel, type Tag } from "@/lib/items";
 import { convertKind, withSubItems } from "@/lib/itemStore";
 import { dueLabel, dueTone } from "@/lib/date";
-import { TODAY } from "@/mocks/today";
-import { wikiPages, getWikiPage } from "@/mocks/wiki";
+import { TODAY } from "@/lib/today";
+import { useWikiPages } from "@/components/workspace/hooks";
 
 const tone = (color: string) => ({ "--tone": color }) as React.CSSProperties;
 
@@ -250,6 +250,8 @@ export function ItemProperties({
   onUpdate: (fn: (i: Item) => Item) => void;
 }) {
   const isTask = item.kind === "task";
+  const wikiPages = useWikiPages();
+  const getWikiPage = (slug: string) => wikiPages.find((p) => p.slug === slug);
   const linkable = wikiPages.filter((p) => !item.wikiRefs.includes(p.slug));
 
   return (

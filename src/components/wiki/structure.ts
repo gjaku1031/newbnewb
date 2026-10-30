@@ -1,4 +1,3 @@
-import { wikiPages } from "@/mocks/wiki";
 import type { WikiPage } from "@/lib/types";
 
 /** 장(카테고리) 순서. 목록에 없는 카테고리는 뒤에 가나다순 */
@@ -10,7 +9,7 @@ export interface WikiChapter {
   pages: WikiPage[];
 }
 
-export function wikiChapters(): WikiChapter[] {
+export function wikiChapters(wikiPages: WikiPage[]): WikiChapter[] {
   const byCat = new Map<string, WikiPage[]>();
   for (const p of wikiPages) {
     const list = byCat.get(p.category) ?? [];
@@ -30,8 +29,8 @@ export function wikiChapters(): WikiChapter[] {
 }
 
 /** 장·절 순서대로 펼친 페이지 목록 (이전/다음 이동용) */
-export function orderedPages() {
-  return wikiChapters().flatMap((c) =>
+export function orderedPages(pages: WikiPage[]) {
+  return wikiChapters(pages).flatMap((c) =>
     c.pages.map((p, i) => ({ page: p, number: `${c.no}.${i + 1}`, chapter: c })),
   );
 }
@@ -43,8 +42,8 @@ export interface NavChapter {
   pages: { slug: string; title: string; number: string; hasIssue: boolean }[];
 }
 
-export function navData(): NavChapter[] {
-  return wikiChapters().map((c) => ({
+export function navData(pages: WikiPage[]): NavChapter[] {
+  return wikiChapters(pages).map((c) => ({
     no: c.no,
     category: c.category,
     pages: c.pages.map((p, i) => ({

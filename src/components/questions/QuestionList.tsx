@@ -7,7 +7,8 @@ import { ChevronRight, ListTodo, Target } from "lucide-react";
 import { EmptyState, VerdictBadge } from "@/components/ui";
 import { fmt } from "@/lib/date";
 import type { QuestionRecord, Verdict } from "@/lib/types";
-import { getItem } from "@/mocks/items";
+import { useItems } from "@/lib/itemStore";
+import { useQuestions } from "@/components/workspace/hooks";
 
 type VerdictFilter = "all" | Verdict;
 type StatusFilter = "all" | QuestionRecord["status"];
@@ -25,7 +26,10 @@ const STATUS_TABS: { key: StatusFilter; label: string }[] = [
   { key: "resolved", label: "해결됨" },
 ];
 
-export function QuestionList({ items }: { items: QuestionRecord[] }) {
+export function QuestionList() {
+  const items: QuestionRecord[] = useQuestions();
+  const allItems = useItems();
+  const getItem = (id: string) => allItems.find((i) => i.id === id);
   const [verdict, setVerdict] = useState<VerdictFilter>("all");
   const [status, setStatus] = useState<StatusFilter>("all");
 

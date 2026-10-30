@@ -5,7 +5,7 @@ import clsx from "clsx";
 import { X } from "lucide-react";
 import type { ItemKind } from "@/lib/types";
 import { addItem } from "@/lib/itemStore";
-import { TODAY } from "@/mocks/today";
+import { TODAY } from "@/lib/today";
 
 /** 새 항목: 제목 → 일정/할 일 → (날짜) → 만들기. 할 일은 날짜 없이 만들면 미배치 */
 export function NewItemDialog({

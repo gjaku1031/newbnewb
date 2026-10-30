@@ -5,23 +5,39 @@ import Link from "next/link";
 import clsx from "clsx";
 import { addDays, parseISO } from "date-fns";
 import { ArrowRight, Check, CheckCircle2, Copy, MessageSquareText, Sparkles, X } from "lucide-react";
-import type { RescheduleItem } from "@/lib/types";
-import { Card, KindTag, PriorityBadge } from "@/components/ui";
+import type { RescheduleItem, RescheduleProposal } from "@/lib/types";
+import { Card, EmptyState, KindTag, PriorityBadge } from "@/components/ui";
 import { fmt } from "@/lib/date";
-import { rescheduleProposal } from "@/mocks/reschedule";
-import { getItem, items } from "@/mocks/items";
+import { useItems } from "@/lib/itemStore";
+import { useReschedule } from "@/components/workspace/hooks";
+import { mutate, refresh } from "@/components/workspace/store";
+import * as actions from "@/server/actions";
 import { displayKind } from "@/lib/items";
-import { TODAY } from "@/mocks/today";
+import { TODAY } from "@/lib/today";
 
 const CLAUDE_PROMPT = `newb의 재배치 제안(r1)을 불러와서 같이 상의하자. 법인카드 정리를 월요일로 미루는 게 괜찮은지 봐줘.`;
 
 export function RescheduleView() {
-  const p = rescheduleProposal;
+  const p = useReschedule();
+  if (!p) return <EmptyState title="지금은 재배치 제안이 없어요" />;
+  return <Proposal key={p.id} p={p} />;
+}
+
+function Proposal({ p }: { p: RescheduleProposal }) {
   const [decisions, setDecisions] = useState<Record<string, boolean>>(() =>
-    Object.fromEntries(p.items.map((it) => [it.itemId, true])),
+    Object.fromEntries(p.items.map((it) => [it.itemId, p.appliedAt ? !!it.accepted : true])),
   );
-  const [applied, setApplied] = useState(false);
+  const [applying, setApplying] = useState(false);
   const [copied, setCopied] = useState(false);
+  const applied = !!p.appliedAt;
+
+  const apply = async () => {
+    setApplying(true);
+    const accepted = p.items.filter((it) => decisions[it.itemId]).map((it) => it.itemId);
+    await mutate(null, () => actions.applyReschedule(p.id, accepted));
+    await refresh();
+    setApplying(false);
+  };
 
   const acceptedCount = Object.values(decisions).filter(Boolean).length;
 
@@ -91,8 +107,8 @@ export function RescheduleView() {
             </Link>
             <button
               type="button"
-              disabled={applied || acceptedCount === 0}
-              onClick={() => setApplied(true)}
+              disabled={applied || applying || acceptedCount === 0}
+              onClick={apply}
               className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-accent px-4 text-[14px] font-medium text-white hover:bg-accent-ink disabled:opacity-50"
             >
               <Check className="size-4" />
@@ -104,7 +120,7 @@ export function RescheduleView() {
 
       {/* 오른쪽: 부하 미리보기 + Claude 상의 */}
       <aside className="space-y-4">
-        <LoadPreview decisions={decisions} />
+        <LoadPreview p={p} decisions={decisions} />
         <Card className="p-5">
           <div className="flex items-center gap-2 text-[14px] font-semibold">
             <MessageSquareText className="size-4 text-accent" />
@@ -136,7 +152,8 @@ function ItemRow({
   disabled: boolean;
   onChange: (v: boolean) => void;
 }) {
-  const q = getItem(it.itemId);
+  const items = useItems();
+  const q = items.find((i) => i.id === it.itemId);
   if (!q) return null;
   const prioChanged = it.fromPriority !== it.toPriority;
   return (
@@ -219,13 +236,14 @@ function ItemRow({
 }
 
 /** 날짜별 배치된 할 일 수 — 변경 전/후 비교 */
-function LoadPreview({ decisions }: { decisions: Record<string, boolean> }) {
+function LoadPreview({ p, decisions }: { p: RescheduleProposal; decisions: Record<string, boolean> }) {
+  const items = useItems();
   const days = Array.from({ length: 8 }, (_, i) => fmt(addDays(parseISO(TODAY), i), "yyyy-MM-dd"));
   const active = items.filter((q) => q.kind === "task" && q.status !== "done");
 
   const countFor = (day: string, after: boolean) =>
     active.filter((q) => {
-      const it = rescheduleProposal.items.find((x) => x.itemId === q.id);
+      const it = p.items.find((x) => x.itemId === q.id);
       const date = after && it && decisions[q.id] ? it.toDate : q.start?.slice(0, 10);
       return date === day;
     }).length;

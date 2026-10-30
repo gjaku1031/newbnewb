@@ -1,9 +1,12 @@
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
 import { ReviewDoneButton } from "@/components/ReviewDoneButton";
 import { AlertTriangle, ArrowRight, Brain, Clock, Inbox, Unlink } from "lucide-react";
 import { fmt } from "@/lib/date";
-import { TODAY } from "@/mocks/today";
-import { sources, wikiPages } from "@/mocks/wiki";
+import { TODAY } from "@/lib/today";
+import { useSources, useWikiPages } from "@/components/workspace/hooks";
 import { FileIcon, IntervalPill, SourceTypeBadge } from "./badges";
 import { wikiChapters } from "./structure";
 import { PendingPanel } from "./PendingPanel";
@@ -28,10 +31,17 @@ function Panel({ title, icon, children }: { title: string; icon: React.ReactNode
 
 /** 위키 첫 화면: Next.js 문서 홈처럼 장(카테고리) 카드 + 오늘 복습·점검·최근 원본 */
 export function WikiHome() {
-  const chapters = wikiChapters();
-  const dueReviews = wikiPages
-    .filter((p) => p.review.nextReview <= TODAY)
-    .sort((a, b) => a.review.nextReview.localeCompare(b.review.nextReview) || a.review.intervalDays - b.review.intervalDays);
+  const wikiPages = useWikiPages();
+  const sources = useSources();
+  const chapters = wikiChapters(wikiPages);
+  // 오늘 복습할 목록은 화면을 연 시점 기준으로 고정 (복습했음을 눌러도 바로 사라지지 않게)
+  const [dueSlugs] = useState(() =>
+    wikiPages
+      .filter((p) => p.review.nextReview <= TODAY)
+      .sort((a, b) => a.review.nextReview.localeCompare(b.review.nextReview) || a.review.intervalDays - b.review.intervalDays)
+      .map((p) => p.slug),
+  );
+  const dueReviews = dueSlugs.flatMap((slug) => wikiPages.filter((p) => p.slug === slug));
   const issuePages = wikiPages.filter((p) => p.issues?.length);
   const recentSources = [...sources].sort((a, b) => b.addedAt.localeCompare(a.addedAt)).slice(0, 5);
 
@@ -91,7 +101,7 @@ export function WikiHome() {
                   {p.title}
                 </Link>
                 <IntervalPill days={p.review.intervalDays} />
-                <ReviewDoneButton intervalDays={p.review.intervalDays} size="sm" />
+                <ReviewDoneButton slug={p.slug} size="sm" />
               </li>
             ))}
           </ul>
@@ -126,7 +136,13 @@ export function WikiHome() {
               <li key={s.id} className="flex items-center gap-2.5 rounded-lg px-2 py-1.5">
                 <FileIcon type={s.fileType} className="size-7" />
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[13px]">{s.title}</span>
+                  {s.hasFile ? (
+                    <a href={`/api/sources/${s.id}/file`} className="block truncate text-[13px] hover:text-accent-ink hover:underline">
+                      {s.title}
+                    </a>
+                  ) : (
+                    <span className="block truncate text-[13px]">{s.title}</span>
+                  )}
                   <span className="flex items-center gap-1.5 text-[11.5px] text-faint">
                     <SourceTypeBadge type={s.type} />
                     {fmt(s.addedAt, "M/d")}
@@ -137,6 +153,19 @@ export function WikiHome() {
           </ul>
         </Panel>
       </div>
+    </div>
+  );
+}
+
+/** 위키 머리말의 페이지·원본 수 */
+export function WikiCounts() {
+  const pages = useWikiPages();
+  const sources = useSources();
+  return (
+    <div className="mt-2 flex gap-3 text-[13px] text-faint tabular">
+      <span>페이지 {pages.length}</span>
+      <span>·</span>
+      <span>원본 {sources.length}</span>
     </div>
   );
 }

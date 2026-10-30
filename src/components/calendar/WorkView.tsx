@@ -29,7 +29,7 @@ import {
   useTags,
 } from "@/lib/itemStore";
 import { NewItemDialog } from "@/components/item/NewItemDialog";
-import { TODAY } from "@/mocks/today";
+import { TODAY } from "@/lib/today";
 import { PriorityBadge } from "@/components/ui";
 import { DropZone, TrayChip } from "./items";
 import { MonthGrid } from "./MonthGrid";

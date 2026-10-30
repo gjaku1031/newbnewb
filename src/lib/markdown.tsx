@@ -1,6 +1,11 @@
+"use client";
+
 import Link from "next/link";
 import { Fragment } from "react";
-import { getWikiPage } from "@/mocks/wiki";
+import { headingId, type TitleOf } from "@/lib/markdownText";
+import { useTitleOf } from "@/components/workspace/hooks";
+
+export { extractHeadings, plainLine } from "@/lib/markdownText";
 
 /**
  * 위키 본문용 아주 작은 마크다운 렌더러.
@@ -8,31 +13,7 @@ import { getWikiPage } from "@/mocks/wiki";
  * 실제 서비스에선 remark 등으로 교체 예정.
  */
 
-/** ## 제목 앵커 id (본문 렌더와 '이 페이지에서' 목차가 같은 규칙을 쓴다) */
-const headingId = (n: number) => `sec-${n}`;
-
-/** 마크다운 기호를 걷어낸 한 줄 (주석 위치 맞추기용) */
-export function plainLine(line: string) {
-  return plainText(line.replace(/^\s*(#{1,6}\s|>\s?|-\s|\d+\.\s)/, ""));
-}
-
-/** 목차용: 본문의 ## 제목 목록 */
-export function extractHeadings(source: string): { id: string; text: string }[] {
-  return source
-    .split("\n")
-    .filter((l) => l.startsWith("## "))
-    .map((l, n) => ({ id: headingId(n), text: plainText(l.slice(3)) }));
-}
-
-/** 마크다운 기호를 걷어낸 글자만 (목차 표시용) */
-function plainText(text: string) {
-  return text
-    .replace(/\*\*([^*]+)\*\*/g, "$1")
-    .replace(/`([^`]+)`/g, "$1")
-    .replace(/\[\[([^\]]+)\]\]/g, (_, slug: string) => getWikiPage(slug)?.title ?? slug);
-}
-
-function inline(text: string, keyBase: string): React.ReactNode[] {
+function inline(text: string, keyBase: string, titleOf: TitleOf): React.ReactNode[] {
   const parts = text.split(/(\*\*[^*]+\*\*|`[^`]+`|\[\[[^\]]+\]\])/g);
   return parts.map((part, i) => {
     const key = `${keyBase}-${i}`;
@@ -40,9 +21,9 @@ function inline(text: string, keyBase: string): React.ReactNode[] {
     if (part.startsWith("`") && part.endsWith("`")) return <code key={key}>{part.slice(1, -1)}</code>;
     if (part.startsWith("[[") && part.endsWith("]]")) {
       const slug = part.slice(2, -2);
-      const page = getWikiPage(slug);
+      const title = titleOf(slug);
       // 아직 없는 페이지는 링크 없이 흐리게
-      if (!page)
+      if (!title)
         return (
           <span key={key} className="text-faint" title="아직 없는 페이지">
             {slug}
@@ -50,7 +31,7 @@ function inline(text: string, keyBase: string): React.ReactNode[] {
         );
       return (
         <Link key={key} href={`/wiki/${slug}`}>
-          {page.title}
+          {title}
         </Link>
       );
     }
@@ -59,6 +40,7 @@ function inline(text: string, keyBase: string): React.ReactNode[] {
 }
 
 export function Markdown({ source, className }: { source: string; className?: string }) {
+  const titleOf = useTitleOf();
   const lines = source.split("\n");
   const blocks: React.ReactNode[] = [];
   let i = 0;
@@ -72,7 +54,7 @@ export function Markdown({ source, className }: { source: string; className?: st
     if (line.startsWith("## ")) {
       blocks.push(
         <h2 key={i} id={headingId(h++)} className="scroll-mt-6" data-line={i}>
-          {inline(line.slice(3), `h${i}`)}
+          {inline(line.slice(3), `h${i}`, titleOf)}
         </h2>,
       );
       i++;
@@ -84,7 +66,7 @@ export function Markdown({ source, className }: { source: string; className?: st
       while (i < lines.length && lines[i].startsWith("> ")) buf.push(lines[i++].slice(2));
       blocks.push(
         <blockquote key={`q${i}`} data-line={from}>
-          {inline(buf.join(" "), `q${i}`)}
+          {inline(buf.join(" "), `q${i}`, titleOf)}
         </blockquote>,
       );
       continue;
@@ -97,7 +79,7 @@ export function Markdown({ source, className }: { source: string; className?: st
         <ul key={`u${i}`}>
           {items.map((t, k) => (
             <li key={k} data-line={from + k}>
-              {inline(t, `u${i}-${k}`)}
+              {inline(t, `u${i}-${k}`, titleOf)}
             </li>
           ))}
         </ul>,
@@ -112,7 +94,7 @@ export function Markdown({ source, className }: { source: string; className?: st
         <ol key={`o${i}`}>
           {items.map((t, k) => (
             <li key={k} data-line={from + k}>
-              {inline(t, `o${i}-${k}`)}
+              {inline(t, `o${i}-${k}`, titleOf)}
             </li>
           ))}
         </ol>,
@@ -121,7 +103,7 @@ export function Markdown({ source, className }: { source: string; className?: st
     }
     blocks.push(
       <p key={i} data-line={i}>
-        {inline(line, `p${i}`)}
+        {inline(line, `p${i}`, titleOf)}
       </p>,
     );
     i++;

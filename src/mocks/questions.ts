@@ -136,17 +136,3 @@ export const questions: QuestionRecord[] = [
     modelId: "llm-signal-rule@v1",
   },
 ];
-
-export const verdictLabel: Record<QuestionRecord["verdict"], string> = {
-  ANSWER: "확답",
-  ANSWER_WITH_CAVEAT: "조건부 답",
-  NEED_INFO: "알아올 것 있음",
-};
-
-export const signalLabel: Record<keyof QuestionRecord["signals"], string> = {
-  coverage: "근거 커버리지",
-  conflict: "근거 충돌",
-  freshness: "근거 신선도",
-  risk: "행동 위험도",
-  ambiguity: "질문 모호성",
-};

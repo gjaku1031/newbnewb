@@ -1,5 +1,5 @@
 import type { EditNote, PageContent, WikiComment } from "@/lib/wikiTypes";
-import { plainLine } from "@/lib/markdown";
+import { plainLine, type TitleOf } from "@/lib/markdownText";
 
 /**
  * 주석대로 문서를 고치는 편집기 — 인터페이스로 분리.
@@ -7,7 +7,11 @@ import { plainLine } from "@/lib/markdown";
  */
 export interface WikiEditor {
   id: string;
-  apply(content: PageContent, comments: WikiComment[]): Promise<{ content: PageContent; edits: EditNote[] }>;
+  apply(
+    content: PageContent,
+    comments: WikiComment[],
+    titleOf?: TitleOf,
+  ): Promise<{ content: PageContent; edits: EditNote[] }>;
 }
 
 const clip = (s: string, n = 24) => (s.length > n ? `${s.slice(0, n)}…` : s);
@@ -21,7 +25,7 @@ const unquote = (s: string) =>
 export class PatternEditor implements WikiEditor {
   id = "pattern-editor@v1";
 
-  async apply(content: PageContent, comments: WikiComment[]) {
+  async apply(content: PageContent, comments: WikiComment[], titleOf?: TitleOf) {
     const lines = content.body.split("\n");
     const edits: EditNote[] = [];
     // 아래 줄부터 고쳐야 줄 번호가 안 밀린다 (추가·삭제)
@@ -30,9 +34,9 @@ export class PatternEditor implements WikiEditor {
     const findLine = (c: WikiComment, needle: string) => {
       if (c.anchor && lines[c.anchor.line] !== undefined) {
         const l = lines[c.anchor.line];
-        if (l.includes(needle) || plainLine(l).includes(needle)) return c.anchor.line;
+        if (l.includes(needle) || plainLine(l, titleOf).includes(needle)) return c.anchor.line;
       }
-      return lines.findIndex((l) => l.includes(needle) || plainLine(l).includes(needle));
+      return lines.findIndex((l) => l.includes(needle) || plainLine(l, titleOf).includes(needle));
     };
 
     const replaceIn = (idx: number, a: string, b: string) => {
@@ -41,7 +45,7 @@ export class PatternEditor implements WikiEditor {
       else {
         // 서식(**굵게** 등) 때문에 그대로 안 보이면 서식을 걷어낸 줄에서 바꾼다
         const prefix = raw.match(/^\s*(#{1,6}\s|>\s?|-\s|\d+\.\s)/)?.[0] ?? "";
-        lines[idx] = prefix + plainLine(raw).replace(a, b);
+        lines[idx] = prefix + plainLine(raw, titleOf).replace(a, b);
       }
     };
 
@@ -71,7 +75,7 @@ export class PatternEditor implements WikiEditor {
         const idx = findLine(c, q);
         if (idx === -1) {
           edits.push({ commentId: c.id, note: `'${clip(q)}' 찾지 못함`, applied: false });
-        } else if (plainLine(lines[idx]).trim() === q || q.length >= plainLine(lines[idx]).trim().length - 2) {
+        } else if (plainLine(lines[idx], titleOf).trim() === q || q.length >= plainLine(lines[idx], titleOf).trim().length - 2) {
           lines.splice(idx, 1);
           edits.push({ commentId: c.id, note: `'${clip(q)}' 줄 삭제`, applied: true });
         } else {

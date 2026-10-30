@@ -4,8 +4,9 @@ import { useState } from "react";
 import clsx from "clsx";
 import { Sparkles, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui";
-import { sourceTypeLabel } from "@/mocks/wiki";
+import { sourceTypeLabel } from "@/lib/labels";
 import type { SourceType } from "@/lib/types";
+import { refresh } from "@/components/workspace/store";
 
 const FORMATS = ["PDF", "DOCX", "XLSX", "PPTX", "HWP", "HWPX", "텍스트"];
 const TYPES: SourceType[] = ["manual", "guideline", "boss_answer", "peer_advice", "note"];
@@ -25,9 +26,31 @@ export function UploadButton() {
 
 function UploadModal({ onClose }: { onClose: () => void }) {
   const [dragging, setDragging] = useState(false);
-  const [files, setFiles] = useState<string[]>([]);
+  const [files, setFiles] = useState<File[]>([]);
   const [type, setType] = useState<SourceType>("guideline");
   const [done, setDone] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const upload = async () => {
+    if (files.length === 0) return;
+    setUploading(true);
+    setError(null);
+    const form = new FormData();
+    form.set("type", type);
+    for (const f of files) form.append("files", f);
+    try {
+      const res = await fetch("/api/sources", { method: "POST", body: form });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error ?? `올리지 못했어요 (${res.status})`);
+      await refresh();
+      setDone(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "올리지 못했어요");
+    } finally {
+      setUploading(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center p-4">
@@ -51,7 +74,7 @@ function UploadModal({ onClose }: { onClose: () => void }) {
             <div className="flex items-start gap-3 rounded-xl bg-accent-soft p-4">
               <Sparkles className="mt-0.5 size-5 shrink-0 text-accent" />
               <div className="text-[13.5px] leading-relaxed">
-                <div className="font-semibold">{files.length}개 파일 정리 중</div>
+                <div className="font-semibold">원본 {files.length}개를 올렸어요</div>
               </div>
             </div>
             <div className="mt-5 flex justify-end">
@@ -69,7 +92,7 @@ function UploadModal({ onClose }: { onClose: () => void }) {
               onDrop={(e) => {
                 e.preventDefault();
                 setDragging(false);
-                setFiles((f) => [...f, ...Array.from(e.dataTransfer.files).map((x) => x.name)]);
+                setFiles((f) => [...f, ...Array.from(e.dataTransfer.files)]);
               }}
               className={clsx(
                 "flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-6 py-9 text-center transition-colors",
@@ -89,7 +112,7 @@ function UploadModal({ onClose }: { onClose: () => void }) {
                 type="file"
                 multiple
                 className="hidden"
-                onChange={(e) => setFiles((f) => [...f, ...Array.from(e.target.files ?? []).map((x) => x.name)])}
+                onChange={(e) => setFiles((f) => [...f, ...Array.from(e.target.files ?? [])])}
               />
             </label>
 
@@ -97,7 +120,7 @@ function UploadModal({ onClose }: { onClose: () => void }) {
               <ul className="mt-3 space-y-1 text-[13px]">
                 {files.map((f, i) => (
                   <li key={i} className="truncate rounded-md bg-sunken px-3 py-1.5">
-                    {f}
+                    {f.name}
                   </li>
                 ))}
               </ul>
@@ -123,13 +146,15 @@ function UploadModal({ onClose }: { onClose: () => void }) {
               </div>
             </div>
 
+            {error && <p className="mt-4 text-[13px] text-danger">{error}</p>}
+
             <div className="mt-6 flex justify-end gap-2">
               <Button variant="ghost" onClick={onClose}>
                 취소
               </Button>
-              <Button variant="primary" onClick={() => setDone(true)}>
+              <Button variant="primary" onClick={upload} disabled={uploading || files.length === 0}>
                 <Sparkles className="size-4" />
-                위키로 정리하기
+                {uploading ? "올리는 중…" : "위키로 정리하기"}
               </Button>
             </div>
           </div>

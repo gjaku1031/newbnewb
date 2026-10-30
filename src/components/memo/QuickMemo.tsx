@@ -5,15 +5,11 @@ import Link from "next/link";
 import clsx from "clsx";
 import { NotebookPen, X } from "lucide-react";
 import { MemoComposer } from "./MemoBoard";
-import { resumePending } from "./store";
 
 /** 오른쪽 아래 빠른 메모 버튼 (주석 툴바 버튼 바로 위) */
 export function QuickMemo() {
   const [open, setOpen] = useState(false);
   const [saved, setSaved] = useState(false);
-
-  // 새로고침 등으로 정리가 멈춘 메모가 있으면 이어서 처리
-  useEffect(() => resumePending(), []);
 
   useEffect(() => {
     if (!open) return;

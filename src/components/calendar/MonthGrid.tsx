@@ -5,7 +5,7 @@ import clsx from "clsx";
 import { Plus } from "lucide-react";
 import { addDays, isSameMonth, startOfMonth, startOfWeek } from "date-fns";
 import type { Tag } from "@/lib/items";
-import { TODAY } from "@/mocks/today";
+import { TODAY } from "@/lib/today";
 import { DropZone, ItemChip } from "./items";
 import {
   applyResize,

@@ -1,118 +1,74 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
 import type { Item } from "@/lib/types";
-import { DEFAULT_TAGS, type Tag } from "@/lib/items";
-import { items as mockItems } from "@/mocks/items";
+import type { Tag } from "@/lib/items";
+import type { WorkspaceSnapshot } from "@/lib/workspace";
+import { TODAY } from "@/lib/today";
+import { getWorkspace, mutate, newClientId, useWorkspace } from "@/components/workspace/store";
+import * as actions from "@/server/actions";
 
 /**
- * 항목·태그 클라이언트 스토어 (목업용).
- * 대시보드·작업·항목 상세가 같은 데이터를 보고, 브라우저 저장소에 저장해 새로고침해도 유지된다.
- * 서버 렌더와 첫 하이드레이션은 목데이터로 그리고, 이후 저장된 값으로 다시 그린다.
+ * 항목·태그 스토어 — 작업공간 스토어 위의 얇은 층.
+ * 화면을 먼저 바꾸고 서버에 저장한다 (실패하면 서버 값으로 되돌림).
  */
-interface State {
-  items: Item[];
-  tags: Tag[];
-}
-
-const KEY = "newb.items.v1";
-const SERVER: State = { items: mockItems, tags: DEFAULT_TAGS };
-let state: State | null = null;
-const listeners = new Set<() => void>();
-
-function load(): State {
-  try {
-    const raw = localStorage.getItem(KEY);
-    if (raw) {
-      const s = JSON.parse(raw);
-      if (Array.isArray(s?.items) && Array.isArray(s?.tags)) return s;
-    }
-  } catch {
-    /* 저장소를 못 읽으면 목데이터로 */
-  }
-  return SERVER;
-}
-
-function get(): State {
-  if (typeof window === "undefined") return SERVER;
-  if (!state) state = load();
-  return state;
-}
-
-function set(next: State) {
-  state = next;
-  try {
-    localStorage.setItem(KEY, JSON.stringify(next));
-  } catch {
-    /* 저장이 막혀 있으면 이번 화면에서만 */
-  }
-  listeners.forEach((l) => l());
-}
-
-function subscribe(l: () => void) {
-  listeners.add(l);
-  const onStorage = (e: StorageEvent) => {
-    if (e.key === KEY) {
-      state = load();
-      l();
-    }
-  };
-  window.addEventListener("storage", onStorage);
-  return () => {
-    listeners.delete(l);
-    window.removeEventListener("storage", onStorage);
-  };
-}
 
 export function useItems(): Item[] {
-  return useSyncExternalStore(
-    subscribe,
-    () => get().items,
-    () => SERVER.items,
-  );
+  return useWorkspace((s) => s.items);
 }
 
 export function useTags(): Tag[] {
-  return useSyncExternalStore(
-    subscribe,
-    () => get().tags,
-    () => SERVER.tags,
-  );
+  return useWorkspace((s) => s.tags);
 }
 
 export function useItem(id: string): Item | undefined {
-  return useItems().find((i) => i.id === id);
+  return useWorkspace((s) => s.items.find((i) => i.id === id));
 }
 
+const withItems = (fn: (items: Item[]) => Item[]) => (s: WorkspaceSnapshot) => ({ ...s, items: fn(s.items) });
+
 export function updateItem(id: string, fn: (i: Item) => Item) {
-  const s = get();
-  set({ ...s, items: s.items.map((i) => (i.id === id ? fn(i) : i)) });
+  const cur = getWorkspace().items.find((i) => i.id === id);
+  if (!cur) return;
+  const next = fn(cur);
+  void mutate(
+    withItems((items) => items.map((i) => (i.id === id ? next : i))),
+    () => actions.saveItem(next),
+  );
 }
 
 export function addItem(item: Omit<Item, "id" | "createdAt">): string {
-  const s = get();
-  const id = `n${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
-  const today = new Date().toISOString().slice(0, 10);
-  set({ ...s, items: [...s.items, { ...item, id, createdAt: today }] });
-  return id;
+  const next: Item = { ...item, id: newClientId("n"), createdAt: TODAY };
+  void mutate(
+    withItems((items) => [...items, next]),
+    () => actions.saveItem(next),
+  );
+  return next.id;
 }
 
 export function deleteItem(id: string) {
-  const s = get();
-  set({ ...s, items: s.items.filter((i) => i.id !== id) });
+  void mutate(
+    withItems((items) => items.filter((i) => i.id !== id)),
+    () => actions.deleteItem(id),
+  );
 }
 
 export function addTag(label: string, color: string) {
-  const s = get();
-  set({ ...s, tags: [...s.tags, { id: `tag-${Date.now().toString(36)}`, label, color }] });
+  const tag: Tag = { id: newClientId("tag-"), label, color };
+  void mutate(
+    (s) => ({ ...s, tags: [...s.tags, tag] }),
+    () => actions.addTag(tag),
+  );
 }
 
 export function removeTag(id: string) {
-  const s = get();
-  set({
-    tags: s.tags.filter((t) => t.id !== id),
-    items: s.items.map((i) => (i.tags.includes(id) ? { ...i, tags: i.tags.filter((t) => t !== id) } : i)),
-  });
+  void mutate(
+    (s) => ({
+      ...s,
+      tags: s.tags.filter((t) => t.id !== id),
+      items: s.items.map((i) => (i.tags.includes(id) ? { ...i, tags: i.tags.filter((t) => t !== id) } : i)),
+    }),
+    () => actions.removeTag(id),
+  );
 }
 
 /** 하위 항목이 바뀌면 진행 상태를 맞춘다: 전부 끝나면 완료, 일부면 진행 중 */

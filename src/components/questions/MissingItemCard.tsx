@@ -5,6 +5,7 @@ import clsx from "clsx";
 import { Check, CheckCircle2, Copy, FileSearch, HelpCircle, RefreshCw, UserRound } from "lucide-react";
 import { Button } from "@/components/ui";
 import type { MissingItem } from "@/lib/types";
+import { answerMissing } from "./actions";
 
 const kindMeta = {
   ask_person: { label: "사람에게 묻기", icon: UserRound },
@@ -12,7 +13,7 @@ const kindMeta = {
   clarify_question: { label: "질문 다듬기", icon: HelpCircle },
 } as const;
 
-export function MissingItemCard({ item, index }: { item: MissingItem; index: number }) {
+export function MissingItemCard({ questionId, item, index }: { questionId: string; item: MissingItem; index: number }) {
   const [copied, setCopied] = useState(false);
   const [draft, setDraft] = useState("");
   const [submitted, setSubmitted] = useState(false);
@@ -100,7 +101,10 @@ export function MissingItemCard({ item, index }: { item: MissingItem; index: num
               className="w-full resize-y rounded-lg border border-line bg-surface px-3 py-2 text-[14px] leading-relaxed outline-none placeholder:text-faint focus:border-accent focus:ring-3 focus:ring-accent/15"
             />
             <div className="mt-2 flex justify-end">
-              <Button size="sm" variant="primary" disabled={!draft.trim()} onClick={() => setSubmitted(true)}>
+              <Button size="sm" variant="primary" disabled={!draft.trim()} onClick={() => {
+                  answerMissing(questionId, index, draft);
+                  setSubmitted(true);
+                }}>
                 <RefreshCw className="size-3.5" />
                 위키에 반영하고 다시 판정
               </Button>

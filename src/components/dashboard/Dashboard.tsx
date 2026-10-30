@@ -20,14 +20,12 @@ import {
 import { parseISO, isWithinInterval, startOfWeek, endOfWeek } from "date-fns";
 import { Card, CardTitle, ItemTagChip, KindTag, PageBody, PageHeader, PriorityBadge, ProgressBar, ProgressRing } from "@/components/ui";
 import { ReviewDoneButton } from "@/components/ReviewDoneButton";
-import { DEFAULT_TAGS, byPriority, displayKind, progress, startDay } from "@/lib/items";
+import { byPriority, displayKind, progress, startDay, type Tag } from "@/lib/items";
 import { dueLabel, dueTone, fmt, today } from "@/lib/date";
-import { useItems } from "@/lib/itemStore";
-import { TODAY, NOW } from "@/mocks/today";
-import { questions } from "@/mocks/questions";
-import { getWikiPage } from "@/mocks/wiki";
-import { morningBriefing, eveningBriefing } from "@/mocks/briefing";
-import type { Item } from "@/lib/types";
+import { useItems, useTags } from "@/lib/itemStore";
+import { TODAY, NOW } from "@/lib/today";
+import { useBriefing, useQuestions, useWikiPages } from "@/components/workspace/hooks";
+import type { EveningBriefing, Item, MorningBriefing, QuestionRecord } from "@/lib/types";
 
 /** 오늘 할 일: 오늘 배치됐거나 마감이 오늘까지인 미완료 할 일 (기다리는 중 제외) */
 function todayTasks(items: Item[]): Item[] {
@@ -52,7 +50,7 @@ function weekStats(items: Item[]) {
 }
 
 /** 알아올 것: 열린 질문의 알아올 것 + 기다리는 중인 할 일 (같은 항목에 열린 질문이 있으면 질문 쪽만) */
-function toFind(items: Item[]) {
+function toFind(items: Item[], questions: QuestionRecord[]) {
   const fromQuestions = questions.flatMap((q) =>
     q.status === "open"
       ? q.missing
@@ -73,12 +71,21 @@ function toFind(items: Item[]) {
   return [...fromQuestions, ...fromWaiting];
 }
 
+const EMPTY_MORNING: MorningBriefing = { date: "", generatedAt: "", greeting: "", focus: [], reviews: [], heads_up: [] };
+
 export function Dashboard() {
   const items = useItems();
+  const tags = useTags();
+  const questions = useQuestions();
+  const wikiPages = useWikiPages();
+  const briefing = useBriefing();
+  const morningBriefing = briefing.morning ?? EMPTY_MORNING;
   const getItem = (id: string) => items.find((i) => i.id === id);
+  const getWikiPage = (slug: string) => wikiPages.find((p) => p.slug === slug);
+  const tagOf = (id: string): Tag | undefined => tags.find((d) => d.id === id);
   const tasks = todayTasks(items);
   const stats = weekStats(items);
-  const findList = toFind(items);
+  const findList = toFind(items, questions);
   const todaysEvents = items
     .filter((i) => i.kind === "event" && startDay(i) === TODAY && !i.allDay)
     .sort((a, b) => (a.start ?? "").localeCompare(b.start ?? ""));
@@ -87,7 +94,7 @@ export function Dashboard() {
     return page ? [{ ...r, page }] : [];
   });
   const nowHHMM = NOW.slice(11, 16);
-  const y = eveningBriefing;
+  const y: EveningBriefing | null = briefing.evening;
 
   return (
     <>
@@ -125,7 +132,7 @@ export function Dashboard() {
                             {it.priority && <PriorityBadge p={it.priority} />}
                             <KindTag kind={kind} />
                             {it.tags.map((t) => {
-                              const tag = DEFAULT_TAGS.find((d) => d.id === t);
+                              const tag = tagOf(t);
                               return tag ? <ItemTagChip key={t} label={tag.label} color={tag.color} /> : null;
                             })}
                           </div>
@@ -225,104 +232,106 @@ export function Dashboard() {
             </Card>
 
             {/* 어제 정리 = 전날 저녁 브리핑 */}
-            <Card>
-              <CardTitle icon={<PencilLine className="size-4" />}>
-                어제 정리{" "}
-                <span className="ml-1 text-[12.5px] font-normal text-muted">{fmt(y.date, "M월 d일 (EEE)")}</span>
-              </CardTitle>
-              <div className="grid gap-6 border-t border-line px-5 py-5 md:grid-cols-2">
-                <section className="space-y-5">
-                  <div>
-                    <SubLabel icon={<CircleCheck className="size-3.5" />}>완료한 일</SubLabel>
-                    <ul className="space-y-1.5">
-                      {y.done.map((id) => {
-                        const it = getItem(id);
-                        if (!it) return null;
-                        return (
-                          <li key={id} className="flex items-center gap-2 text-[14px]">
-                            <CircleCheck className="size-4 shrink-0 text-ok" />
-                            <Link href={`/items/${id}`} className="truncate hover:text-accent-ink">
-                              {it.title}
-                            </Link>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  </div>
-                  <div>
-                    <SubLabel icon={<TrendingUp className="size-3.5" />}>진척</SubLabel>
-                    <ul className="space-y-3">
-                      {y.progressed.map((p) => {
-                        const it = getItem(p.itemId);
-                        if (!it) return null;
-                        return (
-                          <li key={p.itemId}>
-                            <Link href={`/items/${p.itemId}`} className="block truncate text-[14px] hover:text-accent-ink">
-                              {it.title}
-                            </Link>
-                            <div className="mt-1.5 flex items-center gap-3">
-                              <div className="relative h-1.5 flex-1 overflow-hidden rounded-full bg-sunken">
-                                <div className="absolute inset-y-0 left-0 rounded-full bg-accent" style={{ width: `${p.to}%` }} />
-                                <div
-                                  className="absolute inset-y-0 left-0 rounded-full bg-line-strong"
-                                  style={{ width: `${p.from}%` }}
-                                />
-                              </div>
-                              <span className="flex items-center gap-1 text-[12.5px] text-muted tabular">
-                                {p.from}% <ArrowRight className="size-3" />
-                                <span className="font-semibold text-accent-ink">{p.to}%</span>
-                              </span>
-                            </div>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  </div>
-                </section>
-                <section className="space-y-5">
-                  <div>
-                    <SubLabel icon={<GraduationCap className="size-3.5" />}>배운 것</SubLabel>
-                    <ul className="space-y-1.5">
-                      {y.learned.map((l, i) => (
-                        <li key={i} className="flex gap-2.5 text-[14px] leading-relaxed">
-                          <span className="mt-[9px] size-1.5 shrink-0 rounded-full bg-accent" />
-                          {l}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                  <div>
-                    <SubLabel icon={<BookPlus className="size-3.5" />}>위키</SubLabel>
-                    <div className="flex flex-wrap gap-1.5">
-                      {y.wikiAdded.map((slug) => {
-                        const w = getWikiPage(slug);
-                        return w ? (
-                          <Link
-                            key={slug}
-                            href={`/wiki/${slug}`}
-                            className="inline-flex items-center rounded-md bg-ok-soft px-2 py-1 text-[12.5px] text-ok hover:brightness-95"
-                          >
-                            + {w.title}
-                          </Link>
-                        ) : null;
-                      })}
-                      {y.wikiUpdated.map((slug) => {
-                        const w = getWikiPage(slug);
-                        return w ? (
-                          <Link
-                            key={slug}
-                            href={`/wiki/${slug}`}
-                            className="inline-flex items-center rounded-md bg-sunken px-2 py-1 text-[12.5px] text-muted hover:text-ink"
-                          >
-                            ↻ {w.title}
-                          </Link>
-                        ) : null;
-                      })}
+            {y && (
+              <Card>
+                <CardTitle icon={<PencilLine className="size-4" />}>
+                  어제 정리{" "}
+                  <span className="ml-1 text-[12.5px] font-normal text-muted">{fmt(y.date, "M월 d일 (EEE)")}</span>
+                </CardTitle>
+                <div className="grid gap-6 border-t border-line px-5 py-5 md:grid-cols-2">
+                  <section className="space-y-5">
+                    <div>
+                      <SubLabel icon={<CircleCheck className="size-3.5" />}>완료한 일</SubLabel>
+                      <ul className="space-y-1.5">
+                        {y.done.map((id) => {
+                          const it = getItem(id);
+                          if (!it) return null;
+                          return (
+                            <li key={id} className="flex items-center gap-2 text-[14px]">
+                              <CircleCheck className="size-4 shrink-0 text-ok" />
+                              <Link href={`/items/${id}`} className="truncate hover:text-accent-ink">
+                                {it.title}
+                              </Link>
+                            </li>
+                          );
+                        })}
+                      </ul>
                     </div>
-                  </div>
-                </section>
-              </div>
-            </Card>
+                    <div>
+                      <SubLabel icon={<TrendingUp className="size-3.5" />}>진척</SubLabel>
+                      <ul className="space-y-3">
+                        {y.progressed.map((p) => {
+                          const it = getItem(p.itemId);
+                          if (!it) return null;
+                          return (
+                            <li key={p.itemId}>
+                              <Link href={`/items/${p.itemId}`} className="block truncate text-[14px] hover:text-accent-ink">
+                                {it.title}
+                              </Link>
+                              <div className="mt-1.5 flex items-center gap-3">
+                                <div className="relative h-1.5 flex-1 overflow-hidden rounded-full bg-sunken">
+                                  <div className="absolute inset-y-0 left-0 rounded-full bg-accent" style={{ width: `${p.to}%` }} />
+                                  <div
+                                    className="absolute inset-y-0 left-0 rounded-full bg-line-strong"
+                                    style={{ width: `${p.from}%` }}
+                                  />
+                                </div>
+                                <span className="flex items-center gap-1 text-[12.5px] text-muted tabular">
+                                  {p.from}% <ArrowRight className="size-3" />
+                                  <span className="font-semibold text-accent-ink">{p.to}%</span>
+                                </span>
+                              </div>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  </section>
+                  <section className="space-y-5">
+                    <div>
+                      <SubLabel icon={<GraduationCap className="size-3.5" />}>배운 것</SubLabel>
+                      <ul className="space-y-1.5">
+                        {y.learned.map((l, i) => (
+                          <li key={i} className="flex gap-2.5 text-[14px] leading-relaxed">
+                            <span className="mt-[9px] size-1.5 shrink-0 rounded-full bg-accent" />
+                            {l}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div>
+                      <SubLabel icon={<BookPlus className="size-3.5" />}>위키</SubLabel>
+                      <div className="flex flex-wrap gap-1.5">
+                        {y.wikiAdded.map((slug) => {
+                          const w = getWikiPage(slug);
+                          return w ? (
+                            <Link
+                              key={slug}
+                              href={`/wiki/${slug}`}
+                              className="inline-flex items-center rounded-md bg-ok-soft px-2 py-1 text-[12.5px] text-ok hover:brightness-95"
+                            >
+                              + {w.title}
+                            </Link>
+                          ) : null;
+                        })}
+                        {y.wikiUpdated.map((slug) => {
+                          const w = getWikiPage(slug);
+                          return w ? (
+                            <Link
+                              key={slug}
+                              href={`/wiki/${slug}`}
+                              className="inline-flex items-center rounded-md bg-sunken px-2 py-1 text-[12.5px] text-muted hover:text-ink"
+                            >
+                              ↻ {w.title}
+                            </Link>
+                          ) : null;
+                        })}
+                      </div>
+                    </div>
+                  </section>
+                </div>
+              </Card>
+            )}
           </div>
 
           {/* ── 오른쪽 ── */}
@@ -383,7 +392,7 @@ export function Dashboard() {
                         {r.page.review.intervalDays}일마다 · {r.reason}
                       </div>
                     </Link>
-                    <ReviewDoneButton intervalDays={r.page.review.intervalDays} size="sm" />
+                    <ReviewDoneButton slug={r.slug} size="sm" />
                   </li>
                 ))}
               </ul>

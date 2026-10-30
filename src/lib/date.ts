@@ -1,6 +1,6 @@
 import { format, parseISO, differenceInCalendarDays } from "date-fns";
 import { ko } from "date-fns/locale";
-import { TODAY } from "@/mocks/today";
+import { TODAY } from "@/lib/today";
 
 export const today = () => parseISO(TODAY);
 

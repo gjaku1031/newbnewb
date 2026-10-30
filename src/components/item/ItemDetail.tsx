@@ -9,8 +9,7 @@ import { displayKind, statusColor, statusLabel } from "@/lib/items";
 import { deleteItem, updateItem, useItem, useTags } from "@/lib/itemStore";
 import { Card, CardTitle, ItemTagChip, KindTag, PageBody, PriorityBadge, VerdictBadge } from "@/components/ui";
 import { fmt } from "@/lib/date";
-import { getWikiPage } from "@/mocks/wiki";
-import { questions } from "@/mocks/questions";
+import { useQuestions, useWikiPages } from "@/components/workspace/hooks";
 import { DeleteButton, EditableText, ItemProperties } from "./fields";
 import { TaskWork } from "./TaskWork";
 import { ClaudeBrief } from "./ClaudeBrief";
@@ -20,6 +19,8 @@ export function ItemDetail({ id }: { id: string }) {
   const it = useItem(id);
   const tags = useTags();
   const router = useRouter();
+  const questions = useQuestions();
+  const wikiPages = useWikiPages();
 
   if (!it) {
     return (
@@ -38,7 +39,7 @@ export function ItemDetail({ id }: { id: string }) {
   const done = isTodo && it.status === "done";
   const itemTags = it.tags.map((t) => tags.find((d) => d.id === t)).filter((t) => t !== undefined);
   const related = questions.filter((q) => q.itemId === it.id);
-  const wikis = it.wikiRefs.map(getWikiPage).filter((p) => p !== undefined);
+  const wikis = it.wikiRefs.flatMap((slug) => wikiPages.filter((p) => p.slug === slug));
 
   return (
     <>

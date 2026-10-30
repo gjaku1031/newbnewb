@@ -146,4 +146,31 @@ export interface RescheduleProposal {
   createdAt: string;
   summary: string;
   items: RescheduleItem[];
+  /** 반영한 시각 (반영 전이면 없음) */
+  appliedAt?: string;
+}
+
+/** 아침 브리핑 (대시보드) */
+export interface MorningBriefing {
+  date: string;
+  generatedAt: string;
+  greeting: string;
+  focus: string[];
+  /** 망각곡선 기반 오늘 복습할 위키 */
+  reviews: { slug: string; reason: string }[];
+  heads_up: string[];
+}
+
+/** 저녁 브리핑 (다음 날 대시보드의 "어제 정리") */
+export interface EveningBriefing {
+  date: string;
+  generatedAt: string;
+  done: string[];
+  progressed: { itemId: string; from: number; to: number }[];
+  wikiAdded: string[];
+  wikiUpdated: string[];
+  learned: string[];
+  pendingInfo: { questionId: string; what: string }[];
+  tomorrow: string[];
+  note: string;
 }

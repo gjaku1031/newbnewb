@@ -3,32 +3,43 @@
 import { useState } from "react";
 import clsx from "clsx";
 import { Check } from "lucide-react";
-import { addDays, parseISO } from "date-fns";
+import type { WikiReview } from "@/lib/types";
 import { fmt } from "@/lib/date";
-import { TODAY } from "@/mocks/today";
+import { markReviewed, undoReviewed } from "@/components/wiki/store";
 
-/** 다음 노출 간격 — 망각 곡선 계산은 내부에서만 (지금은 단순히 2배, 최대 60일) */
-export function nextInterval(days: number) {
-  return Math.min(60, Math.max(1, days * 2));
-}
+export { nextInterval } from "@/lib/review";
 
-/** 복습했음 버튼: 누르면 다음 복습일이 뒤로 밀린다 (목업: 화면 상태만) */
-export function ReviewDoneButton({ intervalDays, size = "md" }: { intervalDays: number; size?: "sm" | "md" }) {
-  const [done, setDone] = useState(false);
-  const next = fmt(addDays(parseISO(TODAY), nextInterval(intervalDays)), "M/d");
+/** 복습했음 버튼: 누르면 다음 복습일이 뒤로 밀린다 (다시 누르면 되돌리기) */
+export function ReviewDoneButton({ slug, size = "md" }: { slug: string; size?: "sm" | "md" }) {
+  const [done, setDone] = useState<{ prev: WikiReview; next: WikiReview } | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const toggle = async () => {
+    if (busy) return;
+    if (done) {
+      undoReviewed(slug, done.prev);
+      setDone(null);
+      return;
+    }
+    setBusy(true);
+    setDone(await markReviewed(slug));
+    setBusy(false);
+  };
+
   return (
     <button
       type="button"
-      onClick={() => setDone((v) => !v)}
+      onClick={toggle}
+      disabled={busy}
       title={done ? "되돌리기" : undefined}
       className={clsx(
-        "inline-flex shrink-0 items-center gap-1 rounded-md font-medium transition-colors",
+        "inline-flex shrink-0 items-center gap-1 rounded-md font-medium transition-colors disabled:opacity-60",
         size === "sm" ? "h-7 px-2 text-[12px]" : "h-8 px-2.5 text-[12.5px]",
         done ? "bg-ok-soft text-ok" : "border border-line bg-surface hover:bg-sunken",
       )}
     >
       <Check className="size-3.5" />
-      {done ? `복습함 · 다음 ${next}` : "복습했음"}
+      {done ? `복습함 · 다음 ${fmt(done.next.nextReview, "M/d")}` : "복습했음"}
     </button>
   );
 }

@@ -10,6 +10,7 @@ import { fmt } from "@/lib/date";
 import { diffLines, diffStats } from "@/lib/diff";
 import { Markdown, extractHeadings } from "@/lib/markdown";
 import { Button } from "@/components/ui";
+import { useTitleOf } from "@/components/workspace/hooks";
 import { DiffView } from "./DiffView";
 import { IssueBox } from "./IssueBox";
 import { OnThisPage } from "./OnThisPage";
@@ -104,6 +105,7 @@ export function WikiArticle({
   aside?: React.ReactNode;
 }) {
   const s = useWiki();
+  const titleOf = useTitleOf();
   const wide = useWide();
   const page = effectivePage(s, base);
   const revs = revisionsOf(s, base.slug);
@@ -340,7 +342,7 @@ export function WikiArticle({
       <aside className="hidden w-[300px] shrink-0 xl:block">
         <div className="sticky top-8 max-h-[calc(100dvh-4rem)] space-y-7 overflow-y-auto pb-6">
           {wide && panel}
-          <OnThisPage headings={extractHeadings(page.body)} />
+          <OnThisPage headings={extractHeadings(page.body, titleOf)} />
           {aside}
         </div>
       </aside>

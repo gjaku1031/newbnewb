@@ -5,22 +5,21 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import clsx from "clsx";
 import { ChevronDown, ChevronRight, Home, Menu, Search, X } from "lucide-react";
-import type { NavChapter } from "./structure";
+import { navData } from "./structure";
 import { pendingRevisions, useWiki } from "./store";
 
 /** Next.js 문서 스타일 왼쪽 내비게이션 (검색 + 접는 장 + 페이지 트리) */
-function NavTree({ chapters, onNavigate }: { chapters: NavChapter[]; onNavigate?: () => void }) {
+function NavTree({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const current = pathname.startsWith("/wiki/") ? decodeURIComponent(pathname.slice(6)) : null;
   const wiki = useWiki();
+  const chapters = navData(wiki.pages);
   const pending = new Set(pendingRevisions(wiki).map((r) => r.slug));
-  const titleOf = (slug: string, title: string) => wiki.overrides[slug]?.title ?? title;
   const [query, setQuery] = useState("");
   const [closed, setClosed] = useState<Set<string>>(new Set());
 
   const q = query.trim().toLowerCase();
   const filtered = chapters
-    .map((c) => ({ ...c, pages: c.pages.map((p) => ({ ...p, title: titleOf(p.slug, p.title) })) }))
     .map((c) => ({ ...c, pages: q ? c.pages.filter((p) => p.title.toLowerCase().includes(q)) : c.pages }))
     .filter((c) => c.pages.length > 0);
 
@@ -111,18 +110,18 @@ function NavTree({ chapters, onNavigate }: { chapters: NavChapter[]; onNavigate?
 }
 
 /** 데스크톱: 고정 사이드바 */
-export function WikiSidebar({ chapters }: { chapters: NavChapter[] }) {
+export function WikiSidebar() {
   return (
     <aside className="hidden w-[264px] shrink-0 border-r border-line lg:block">
       <div className="sticky top-0 h-dvh overflow-y-auto">
-        <NavTree chapters={chapters} />
+        <NavTree />
       </div>
     </aside>
   );
 }
 
 /** 태블릿·모바일: 상단 '위키 목차' 버튼 → 서랍 */
-export function WikiMobileNav({ chapters }: { chapters: NavChapter[] }) {
+export function WikiMobileNav() {
   const [open, setOpen] = useState(false);
   return (
     <div className="border-b border-line px-6 py-2 lg:hidden">
@@ -146,7 +145,7 @@ export function WikiMobileNav({ chapters }: { chapters: NavChapter[] }) {
               <X className="size-4" />
             </button>
             <div className="pt-8">
-              <NavTree chapters={chapters} onNavigate={() => setOpen(false)} />
+              <NavTree onNavigate={() => setOpen(false)} />
             </div>
           </div>
         </div>

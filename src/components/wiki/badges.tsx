@@ -8,7 +8,7 @@ import {
   StickyNote,
 } from "lucide-react";
 import type { Source } from "@/lib/types";
-import { sourceTypeLabel } from "@/mocks/wiki";
+import { sourceTypeLabel } from "@/lib/labels";
 
 const fileMeta: Record<Source["fileType"], { icon: typeof FileText; label: string; cls: string }> = {
   pdf: { icon: FileText, label: "PDF", cls: "text-danger" },

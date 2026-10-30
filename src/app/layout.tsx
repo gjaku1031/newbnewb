@@ -1,9 +1,10 @@
 import type { Metadata, Viewport } from "next";
 import "pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css";
 import "./globals.css";
-import { AppShell } from "@/components/shell/AppShell";
+import { Suspense } from "react";
 import { AgentationToolbar } from "@/components/dev/AgentationToolbar";
-import { QuickMemo } from "@/components/memo/QuickMemo";
+import { PageSkeleton } from "@/components/PageSkeleton";
+import { WorkspaceGate } from "@/components/workspace/WorkspaceGate";
 
 export const metadata: Metadata = {
   title: "newb — 신입과 함께 일하는 에이전트",
@@ -24,9 +25,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="ko" className="h-full antialiased">
       <body className="min-h-full">
-        <AppShell>{children}</AppShell>
+        {/* 로그인 확인 + DB에서 작업공간을 읽는 동안 뼈대를 보여준다 */}
+        <Suspense fallback={<PageSkeleton />}>
+          <WorkspaceGate>{children}</WorkspaceGate>
+        </Suspense>
         {/* 로그인한 사용자에게만 표시 (컴포넌트 안에서 확인) */}
-        <QuickMemo />
         <AgentationToolbar />
       </body>
     </html>

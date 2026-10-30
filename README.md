@@ -6,9 +6,9 @@
 
 ![대시보드](docs/images/dashboard.png)
 
-> **현재 단계: 웹 프론트 목업**
-> 모든 화면은 목데이터로 동작하고, 수정 내용은 브라우저 저장소에만 저장됩니다.
-> 백엔드(MySQL), 로그인(Passkey), Claude 연동(MCP)은 아직 붙이지 않았습니다. → [로드맵](#로드맵)
+> **현재 단계: 백엔드 연결**
+> 모든 화면이 MySQL·Object Storage에 저장됩니다. 판정기·위키 검토기·메모 처리기는 아직 규칙 기반 목업이고,
+> 로그인(Passkey)과 Claude 연동(MCP)은 붙이지 않았습니다. → [로드맵](#로드맵)
 
 ---
 
@@ -82,7 +82,8 @@
 - React 19, TypeScript, Tailwind CSS v4, Pretendard
 - @dnd-kit (캘린더 드래그), date-fns, lucide-react
 - [Agentation](https://www.agentation.com/) — 화면에 주석을 달아 Claude Code로 QA (로그인 사용자만, `/api/agentation` 프록시)
-- Drizzle ORM + mysql2, AWS S3 SDK (OCI Object Storage S3 호환 API), Docker(Next.js standalone)
+- Drizzle ORM + mysql2, zod(서버 액션 입력 검증), AWS S3 SDK (OCI Object Storage S3 호환 API), Docker(Next.js standalone)
+- 테스트: Vitest + Testcontainers(MySQL)
 - 예정: Passkey(WebAuthn), MCP 서버(`/api/mcp`), oci-prod 배포(arm64 + Caddy)
 
 ## 시작하기
@@ -92,6 +93,7 @@ npm install
 cp .env.example .env.local
 npm run infra:up     # MySQL + S3(RustFS) + 버킷 생성 (Docker)
 npm run db:migrate   # 테이블 생성
+npm run db:seed      # 목데이터 넣기 (비어 있을 때만, --force면 지우고 다시)
 npm run dev          # http://localhost:3000
 ```
 
@@ -106,6 +108,23 @@ npm run dev          # http://localhost:3000
 - 연결 확인: `curl localhost:3000/api/health` → `{"status":"ok","checks":{"db":"ok","storage":"ok"}}`
 - 스키마 변경: `src/server/db/schema.ts` 수정 → `npm run db:generate` → `npm run db:migrate`
 - 초기화: `docker compose down -v` (데이터까지 삭제)
+- 테스트: `npm test` — 운영과 같은 MySQL 26.7.0을 Testcontainers로 띄워 저장·위키 검토·메모 처리·재배치를 검증 (Docker 필요)
+
+### 데이터 흐름
+
+```
+서버 렌더   WorkspaceGate: 로그인 확인 → DB에서 작업공간 스냅샷 → WorkspaceProvider
+화면       useItems / useWiki / useMemos … (스냅샷에서 읽기)
+바꾸기     화면을 먼저 바꾸고 → 서버 액션(로그인 확인 + zod 검증) → DB
+           실패하면 서버 값으로 되돌리고 오류 표시
+서버 처리   위키 검토·메모 처리는 응답 뒤 after()로 실행, 화면은 끝날 때까지 /api/workspace를 다시 불러옴
+           서버가 재시작돼 멈춘 처리는 다음 /api/workspace 요청 때 다시 돌림
+원본 파일   POST /api/sources → Object Storage + sources 테이블, GET /api/sources/{id}/file로 내려받기
+```
+
+- 로그인은 아직 임시(`src/lib/auth.ts`): `next dev`는 로그인된 상태, 운영 빌드는 항상 비로그인이라 **데이터가 하나도 나가지 않습니다** (Passkey 붙이면 교체).
+- "오늘"은 한국 시간 기준이며, 서버가 스냅샷에 담아 보낸 시각으로 맞춥니다 (`src/lib/today.ts`).
+- 사람 이름·내부 메모·자료 제공자는 DB에만 있고 화면으로 보내지 않습니다 (Claude 답변용).
 
 다른 기기(같은 Tailscale 망 등)에서 개발 서버에 접속하려면 `.env.local`에 허용할 주소를 적습니다.
 
@@ -129,13 +148,14 @@ claude mcp add agentation -- npx -y agentation-mcp server
 ```
 src/
 ├─ app/                    라우트 (오늘, tasks, wiki, memos, questions, items/[id], reschedule, settings)
-│  └─ api/                 agentation 프록시, auth/me, health
+│  └─ api/                 workspace(스냅샷), sources(원본 업로드·내려받기), health, agentation 프록시, auth/me
 ├─ components/
 │  ├─ calendar/            작업 화면 — 월 그리드, 데이터베이스 표, 필터 바, 상세 패널
 │  ├─ dashboard/           오늘 대시보드
 │  ├─ item/                항목 상세·편집 필드·새 항목·Claude 작업 지침
 │  ├─ wiki/                문서 내비게이션, 본문·주석·diff·변경 이력, 위키 스토어
 │  ├─ memo/                메모 탭, 빠른 메모 버튼, 메모 스토어
+│  ├─ workspace/           작업공간 스토어(낙관적 업데이트·다시 불러오기), Provider, 로그인 확인 Gate
 │  └─ …                    질문 기록, 재배치, 설정, 공통 UI
 ├─ lib/
 │  ├─ types.ts             도메인 타입 (Item, WikiPage, QuestionRecord …)
@@ -145,11 +165,16 @@ src/
 │  ├─ memoProcessor.ts     메모 처리기 인터페이스 (MemoProcessor)
 │  └─ diff.ts              줄 단위 diff
 ├─ server/                 서버 전용 (server-only)
-│  ├─ db/                  Drizzle 스키마 · MySQL 연결
+│  ├─ db/                  Drizzle 스키마 · MySQL 연결 · 값 변환
+│  ├─ services/            도메인 로직 (항목·위키·메모·질문·재배치·원본·작업공간) — 테스트 대상
+│  ├─ actions.ts           서버 액션 (로그인 확인 → 검증 → 서비스)
+│  ├─ validation.ts        입력 검증 (zod)
+│  ├─ seed.ts              목데이터 시드
 │  └─ storage.ts           Object Storage(S3) 클라이언트
-└─ mocks/                  목데이터 (wikiInternal.ts는 server-only)
+└─ mocks/                  목데이터 — 시드·테스트에서만 사용 (wikiInternal.ts는 server-only)
 drizzle/                   DB 마이그레이션 SQL
-scripts/migrate.mjs        마이그레이션 실행기
+scripts/                   마이그레이션·시드 실행기
+test/                      통합 테스트 (Testcontainers MySQL)
 compose.yaml · Dockerfile  로컬 인프라 · 앱 이미지
 docs/PLAN.md               기획·결정 기록
 ```
@@ -159,7 +184,7 @@ docs/PLAN.md               기획·결정 기록
 - [x] 웹 프론트 목업 (대시보드, 작업, 위키, 메모, 질문 기록, 재배치, 설정)
 - [x] QA 반영: 항목 통합 모델, 캘린더/데이터베이스 보기, 위키 주석 반영 흐름, 빠른 메모
 - [x] 인프라: 로컬 Docker(MySQL·S3), Drizzle 마이그레이션, 앱 이미지
-- [ ] 백엔드: MySQL 스키마, Route Handlers, 서버 저장
+- [x] 백엔드: MySQL 스키마, 서버 액션·Route Handlers, 서버 저장, 원본 업로드(Object Storage)
 - [ ] Passkey 로그인 (1인용)
 - [ ] MCP 서버 + Claude Desktop 커스텀 커넥터 (`ask_newb`, `get_task_brief`, `get_guidelines`, `add_to_wiki`)
 - [ ] 판정기·위키 검토기·메모 처리기를 Claude로 교체
