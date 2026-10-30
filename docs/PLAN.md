@@ -267,7 +267,7 @@ interface DecisionModel {
 
 ### 8-2. oci-prod 서버 현황
 - **ARM64 (aarch64)**, 2코어, RAM 7.7GB, 디스크 48GB(여유 35GB), Ubuntu 26.04
-- Docker 사용 중, 기존 `ken-blog` 스택 (api + **Caddy가 80/443 점유**), Tailscale 연결됨
+- Docker 사용 중, 기존 서비스가 Caddy로 **80/443을 사용** 중 (같은 Caddy에 사이트 블록 추가 예정)
 - 배포 방식: Next.js `standalone` 이미지를 **arm64로 빌드** → 컨테이너 1개 추가 (127.0.0.1 바인딩) → 기존 Caddy에 사이트 블록 추가
 - 주의: 서버에서 `next build`는 메모리를 많이 씀 → 로컬/CI에서 arm64 이미지 빌드 후 전송 권장
 
