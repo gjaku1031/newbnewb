@@ -7,6 +7,8 @@ import { Bot, Check, ChevronDown, ChevronRight, Loader2, MessageSquarePlus, X } 
 import type { Source, WikiPage } from "@/lib/types";
 import { sources } from "@/mocks/wiki";
 import { FileIcon, SourceTypeBadge, fileLabel } from "./badges";
+import { CautionBox } from "@/components/caution/CautionBox";
+import { cautionsForWiki, useCautions } from "@/lib/cautionStore";
 import type { Revision, RevisionStatus, WikiComment } from "@/lib/wikiTypes";
 import { fmt } from "@/lib/date";
 import { diffLines, diffStats } from "@/lib/diff";
@@ -106,6 +108,7 @@ export function WikiArticle({
   aside?: React.ReactNode;
 }) {
   const s = useWiki();
+  const cautions = cautionsForWiki(useCautions(), base.slug);
   const wide = useWide();
   const page = effectivePage(s, base);
   const revs = revisionsOf(s, base.slug);
@@ -305,6 +308,8 @@ export function WikiArticle({
             ))}
           </div>
         ) : null}
+
+        <CautionBox list={cautions} className="mt-6" />
 
         {/* 본문 — 선택하면 주석, 문단에 마우스를 올리면 말풍선 */}
         <div

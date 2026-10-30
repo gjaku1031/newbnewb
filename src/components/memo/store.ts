@@ -5,6 +5,7 @@ import { format } from "date-fns";
 import type { Memo, MemoAction } from "@/lib/memoTypes";
 import { memoProcessor, type MemoPlan } from "@/lib/memoProcessor";
 import { addItem } from "@/lib/itemStore";
+import { addCaution } from "@/lib/cautionStore";
 import { fmt } from "@/lib/date";
 import { TODAY } from "@/mocks/today";
 import { currentContent, getWikiState, submitRevision } from "@/components/wiki/store";
@@ -43,6 +44,18 @@ const SEED: Memo[] = [
     },
   },
 ];
+
+// 주의할 점 목데이터(c1)의 출처 메모
+SEED.push({
+  id: "m3",
+  text: "팀장 주간보고 시간순으로 썼다고 다시 쓰래 결론부터 쓰라고함 ㅠ",
+  createdAt: "2026-10-24T17:40",
+  status: "done",
+  result: {
+    cleaned: "팀장님: 주간보고를 시간순으로 써서 다시 쓰래. 결론부터 쓰라고 함.",
+    actions: [{ kind: "add_caution", label: "주의할 점 추가 · 주간보고는 결론(성과)부터", href: "/wiki/cautions#c1" }],
+  },
+});
 
 let state: Memo[] | null = null;
 const listeners = new Set<() => void>();
@@ -111,8 +124,19 @@ export function deleteMemo(id: string) {
 const day = (d: string) => fmt(d, "M/d (EEE)");
 
 /** 처리 계획을 실제 항목·위키에 반영하고, 한 일을 기록 */
-function applyPlan(plan: MemoPlan): MemoAction[] {
+function applyPlan(plan: MemoPlan, memoId: string): MemoAction[] {
   const actions: MemoAction[] = [];
+
+  for (const c of plan.cautions) {
+    const id = addCaution({
+      point: c.point,
+      by: c.by,
+      source: { kind: "memo", id: memoId },
+      wikiRefs: c.wikiSlug ? [c.wikiSlug] : [],
+      tags: [],
+    });
+    actions.push({ kind: "add_caution", label: `주의할 점 추가 · ${c.point}`, href: `/wiki/cautions#${id}` });
+  }
 
   for (const e of plan.events) {
     const start = e.time ? `${e.date}T${e.time}` : `${e.date}T00:00`;
@@ -190,7 +214,7 @@ async function processMemo(id: string) {
   const memo = get().find((m) => m.id === id);
   if (!memo || memo.status !== "processing") return;
   const plan = await memoProcessor.process(memo.text, TODAY);
-  const actions = applyPlan(plan);
+  const actions = applyPlan(plan, id);
   set(get().map((m) => (m.id === id ? { ...m, status: "done", result: { cleaned: plan.cleaned, actions } } : m)));
 }
 

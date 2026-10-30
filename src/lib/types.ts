@@ -95,6 +95,30 @@ export interface WikiPage {
   issues?: { kind: "conflict" | "stale" | "orphan"; message: string }[];
 }
 
+/**
+ * 주의할 점 — 실수·지적받은 것을 모아 두고, 비슷한 일을 할 때 먼저 알려준다.
+ * 사람 이름은 남기지 않고 직책만 (by).
+ */
+export interface Caution {
+  id: string;
+  /** 주의할 점 한 줄 (맞는 방법 중심) */
+  point: string;
+  /** 무엇이 문제였는지 */
+  wrong?: string;
+  /** 지적한 사람의 직책 (팀장님·선임님 등) */
+  by?: string;
+  /** 어디서 나왔는지 */
+  source: { kind: "memo" | "question" | "wiki" | "manual"; id?: string };
+  /** 이 위키를 쓰는 일에 알려준다 */
+  wikiRefs: string[];
+  /** 이 태그가 붙은 일에 알려준다 */
+  tags: string[];
+  createdAt: string;
+  review: { nextReview: string; intervalDays: number };
+  /** 충분히 익혀서 더는 알려주지 않음 */
+  archived?: boolean;
+}
+
 export type Verdict = "ANSWER" | "ANSWER_WITH_CAVEAT" | "NEED_INFO";
 
 export interface MissingItem {

@@ -9,6 +9,8 @@ import { displayKind, progress, type Tag } from "@/lib/items";
 import { KindTag, PriorityBadge, ProgressRing, VerdictBadge } from "@/components/ui";
 import { ClaudeBrief } from "@/components/item/ClaudeBrief";
 import { questions } from "@/mocks/questions";
+import { CautionBox } from "@/components/caution/CautionBox";
+import { cautionsFor, useCautions } from "@/lib/cautionStore";
 import { DeleteButton, EditableText, ItemProperties, SubItemsEditor } from "@/components/item/fields";
 
 /**
@@ -35,6 +37,7 @@ export function DetailPanel({
   const pct = progress(item);
   const done = isTask && item.status === "done";
   const related = questions.filter((q) => q.itemId === item.id);
+  const cautions = cautionsFor(useCautions(), item);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -98,6 +101,8 @@ export function DetailPanel({
             </div>
           </section>
 
+          <CautionBox list={cautions} />
+
           {isTask && item.status === "waiting" && item.waitingFor && (
             <div className="flex gap-3 rounded-xl border border-info/25 bg-info-soft px-4 py-3.5">
               <Hourglass className="mt-0.5 size-4.5 shrink-0 text-info" />
@@ -142,6 +147,7 @@ export function DetailPanel({
               itemId={item.id}
               brief={item.brief}
               guidelines={item.wikiRefs}
+              cautions={cautions}
               onSave={(brief) => onUpdate((i) => ({ ...i, brief }))}
             />
           )}

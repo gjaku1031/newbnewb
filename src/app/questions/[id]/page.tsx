@@ -11,6 +11,7 @@ import { questions, signalLabel } from "@/mocks/questions";
 import { getItem } from "@/mocks/items";
 import { getWikiPage } from "@/mocks/wiki";
 import { ItemLink } from "@/components/item/ItemPeek";
+import { SaveAsCaution } from "@/components/caution/SaveAsCaution";
 
 export function generateStaticParams() {
   return questions.map((q) => ({ id: q.id }));
@@ -49,6 +50,9 @@ export default async function QuestionDetailPage(props: PageProps<"/questions/[i
             <div className="mt-3 flex flex-wrap items-center gap-3">
               <VerdictBadge v={q.verdict} />
               <span className="text-[13px] text-muted tabular">확신도 {Math.round(q.confidence * 100)}%</span>
+              <span className="ml-auto">
+                <SaveAsCaution q={q} />
+              </span>
             </div>
           </header>
 

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import clsx from "clsx";
-import { BookOpen, CalendarPlus, HelpCircle, ListPlus, Loader2, Sparkles, Trash2 } from "lucide-react";
+import { BookOpen, CalendarPlus, HelpCircle, ListPlus, Loader2, ShieldAlert, Sparkles, Trash2 } from "lucide-react";
 import type { Memo, MemoAction, MemoActionKind } from "@/lib/memoTypes";
 import { fmt } from "@/lib/date";
 import { useWiki } from "@/components/wiki/store";
@@ -15,6 +15,7 @@ const ACTION_ICON: Record<MemoActionKind, typeof CalendarPlus> = {
   create_task: ListPlus,
   ask: HelpCircle,
   update_wiki: BookOpen,
+  add_caution: ShieldAlert,
 };
 
 const ACTION_TONE: Record<MemoActionKind, string> = {
@@ -22,6 +23,7 @@ const ACTION_TONE: Record<MemoActionKind, string> = {
   create_task: "text-[var(--kind-simple)]",
   ask: "text-info",
   update_wiki: "text-accent",
+  add_caution: "text-warn",
 };
 
 /** 메모 입력창 (메모 탭 상단 · 빠른 메모 공용) */

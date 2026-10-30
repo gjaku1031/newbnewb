@@ -14,6 +14,7 @@ import {
   Megaphone,
   MessageCircleQuestion,
   PencilLine,
+  ShieldAlert,
   Target,
   TrendingUp,
 } from "lucide-react";
@@ -23,6 +24,7 @@ import { ReviewDoneButton } from "@/components/ReviewDoneButton";
 import { DEFAULT_TAGS, byPriority, displayKind, progress, startDay } from "@/lib/items";
 import { dueLabel, dueTone, fmt, today } from "@/lib/date";
 import { useItems } from "@/lib/itemStore";
+import { cautionsFor, useCautions } from "@/lib/cautionStore";
 import { TODAY, NOW } from "@/mocks/today";
 import { questions } from "@/mocks/questions";
 import { getWikiPage } from "@/mocks/wiki";
@@ -77,6 +79,7 @@ function toFind(items: Item[]) {
 
 export function Dashboard() {
   const items = useItems();
+  const cautions = useCautions();
   const getItem = (id: string) => items.find((i) => i.id === id);
   const tasks = todayTasks(items);
   const stats = weekStats(items);
@@ -129,6 +132,12 @@ export function Dashboard() {
                               const tag = DEFAULT_TAGS.find((d) => d.id === t);
                               return tag ? <ItemTagChip key={t} label={tag.label} color={tag.color} /> : null;
                             })}
+                            {cautionsFor(cautions, it).length > 0 && (
+                              <span className="inline-flex h-[20px] items-center gap-1 rounded-[5px] bg-warn-soft px-1.5 text-[11.5px] font-semibold text-warn">
+                                <ShieldAlert className="size-3" />
+                                주의 {cautionsFor(cautions, it).length}
+                              </span>
+                            )}
                           </div>
                           <div className="mt-1.5 truncate text-[15px] font-medium group-hover:text-accent-ink">
                             {it.title}
@@ -264,7 +273,7 @@ export function Dashboard() {
                               <div className="relative h-1.5 flex-1 overflow-hidden rounded-full bg-sunken">
                                 <div className="absolute inset-y-0 left-0 rounded-full bg-accent" style={{ width: `${p.to}%` }} />
                                 <div
-                                  className="absolute inset-y-0 left-0 rounded-full bg-line-strong"
+                                  className="absolute inset-y-0 left-0 rounded-l-full bg-accent/45"
                                   style={{ width: `${p.from}%` }}
                                 />
                               </div>
@@ -291,6 +300,29 @@ export function Dashboard() {
                       ))}
                     </ul>
                   </div>
+                  {cautions.some((c) => c.createdAt === y.date) && (
+                    <div>
+                      <SubLabel icon={<ShieldAlert className="size-3.5" />}>주의할 점</SubLabel>
+                      <ul className="space-y-2">
+                        {cautions
+                          .filter((c) => c.createdAt === y.date)
+                          .map((c) => (
+                            <li key={c.id}>
+                              <Link
+                                href={`/wiki/cautions#${c.id}`}
+                                className="flex gap-2.5 rounded-lg bg-warn-soft px-3 py-2 text-[14px] leading-snug hover:brightness-[0.98]"
+                              >
+                                <ShieldAlert className="mt-0.5 size-4 shrink-0 text-warn" />
+                                <span className="min-w-0">
+                                  <span className="font-medium">{c.point}</span>
+                                  {c.by && <span className="ml-1.5 text-[12.5px] text-muted">{c.by}</span>}
+                                </span>
+                              </Link>
+                            </li>
+                          ))}
+                      </ul>
+                    </div>
+                  )}
                   <div>
                     <SubLabel icon={<BookPlus className="size-3.5" />}>위키</SubLabel>
                     <div className="flex flex-wrap gap-1.5">
