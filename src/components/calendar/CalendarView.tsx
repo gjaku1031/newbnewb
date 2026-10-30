@@ -1,0 +1,276 @@
+"use client";
+
+import { useRef, useState } from "react";
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  TouchSensor,
+  pointerWithin,
+  rectIntersection,
+  type CollisionDetection,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
+} from "@dnd-kit/core";
+import { addMonths, parseISO, startOfMonth } from "date-fns";
+import { ChevronLeft, ChevronRight, Inbox } from "lucide-react";
+import type { DisplayKind, Item } from "@/lib/types";
+import { DEFAULT_TAGS, KIND_META, displayKind, type Tag } from "@/lib/items";
+import { fmt } from "@/lib/date";
+import { items as initialItems } from "@/mocks/items";
+import { TODAY } from "@/mocks/today";
+import { PriorityBadge } from "@/components/ui";
+import { DropZone, TrayChip } from "./items";
+import { MonthGrid } from "./MonthGrid";
+import { DetailPanel } from "./DetailPanel";
+import { TagBar } from "./TagBar";
+import {
+  applyResize,
+  asCal,
+  dateAtPoint,
+  daysBetween,
+  dragItemId,
+  isPlaced,
+  parseDropDate,
+  shiftItem,
+  startDay,
+  toneStyle,
+  type Edge,
+  type Selection,
+} from "./model";
+
+/** 드롭 위치는 막대 전체가 아니라 포인터(손가락) 아래 칸으로 판단 */
+const collision: CollisionDetection = (args) => {
+  const hit = pointerWithin(args);
+  return hit.length ? hit : rectIntersection(args);
+};
+
+export function CalendarView() {
+  const [month, setMonth] = useState<Date>(() => startOfMonth(parseISO(TODAY)));
+  const [items, setItems] = useState<Item[]>(initialItems);
+  const [tags, setTags] = useState<Tag[]>(DEFAULT_TAGS);
+  const [hiddenTags, setHiddenTags] = useState<Set<string>>(new Set());
+  const [hiddenKinds, setHiddenKinds] = useState<Set<DisplayKind>>(new Set());
+  const [selection, setSelection] = useState<Selection>(null);
+  const [dragging, setDragging] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  /** 여러 날 항목을 가운데쯤 잡고 끌 때, 잡은 지점이 시작일에서 며칠 떨어졌는지 */
+  const grabOffset = useRef(0);
+
+  // 마우스는 5px 움직이면 드래그, 터치(아이패드·아이폰)는 길게 눌러 드래그
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 6 } }),
+  );
+
+  const itemOf = (id?: string | null) => (id ? items.find((i) => i.id === id) : undefined);
+
+  /** 유형·태그 필터: 유형이 숨겨졌거나, 붙은 태그 중 하나라도 숨겨졌으면 안 보임 */
+  const isVisible = (i: Item) => !hiddenKinds.has(displayKind(i)) && !i.tags.some((t) => hiddenTags.has(t));
+
+  const placed = items.filter(isPlaced).filter(isVisible).map(asCal);
+  const unscheduled = items.filter((i) => i.kind === "task" && !i.start && i.status !== "done");
+
+  const flash = (msg: string) => {
+    setToast(msg);
+    window.setTimeout(() => setToast(null), 2200);
+  };
+
+  const update = (id: string, fn: (i: Item) => Item) => setItems((list) => list.map((i) => (i.id === id ? fn(i) : i)));
+
+  const onDragStart = (e: DragStartEvent) => {
+    const id = String(e.active.id);
+    setDragging(id);
+    grabOffset.current = 0;
+    const it = itemOf(dragItemId(id));
+    const act = e.activatorEvent as PointerEvent | TouchEvent;
+    const pt = "touches" in act ? act.touches[0] : act;
+    const grabbed = it?.start && pt ? dateAtPoint(pt.clientX, pt.clientY) : null;
+    if (it?.start && grabbed) grabOffset.current = Math.max(0, daysBetween(it.start.slice(0, 10), grabbed));
+  };
+
+  const onDragEnd = ({ active, over }: DragEndEvent) => {
+    setDragging(null);
+    if (!over) return;
+    const id = dragItemId(String(active.id));
+    const it = itemOf(id);
+    if (!it) return;
+    const overId = String(over.id);
+
+    // 보관함으로: 할 일만 미배치로
+    if (overId === "tray") {
+      if (it.kind === "task" && it.start) {
+        update(id, (i) => ({ ...i, start: undefined, end: undefined, allDay: undefined }));
+        flash(`'${it.title}' 미배치로 옮김`);
+      }
+      return;
+    }
+
+    const date = parseDropDate(overId);
+    if (!date) return;
+
+    if (!it.start) {
+      // 미배치 할 일 → 그 날 종일 배치
+      update(id, (i) => ({ ...i, start: `${date}T00:00`, end: `${date}T23:59`, allDay: true }));
+      flash(`'${it.title}' ${fmt(date, "M월 d일 (EEE)")}에 배치`);
+      return;
+    }
+
+    const cal = asCal(it);
+    const delta = daysBetween(startDay(cal), date) - grabOffset.current;
+    if (delta === 0) return;
+    const moved = shiftItem(cal, delta);
+    update(id, (i) => ({ ...i, start: moved.start, end: moved.end }));
+    flash(`'${it.title}' ${fmt(startDay(moved), "M월 d일 (EEE)")}로 이동`);
+  };
+
+  const resizeItem = (id: string, edge: Edge, date: string) => {
+    const it = itemOf(id);
+    if (!it?.start) return;
+    const cal = asCal(it);
+    const next = applyResize(cal, edge, date);
+    if (next.start === cal.start && next.end === cal.end) return;
+    update(id, (i) => ({ ...i, start: next.start, end: next.end }));
+    const s = fmt(next.start, "M월 d일");
+    const e = fmt(next.end, "M월 d일");
+    flash(s === e ? `'${it.title}' ${s} 하루` : `'${it.title}' ${s} – ${e}`);
+  };
+
+  const toggleIn = <T,>(set: Set<T>, v: T) => {
+    const next = new Set(set);
+    if (next.has(v)) next.delete(v);
+    else next.add(v);
+    return next;
+  };
+
+  const addTag = (label: string, color: string) => {
+    setTags((t) => [...t, { id: `tag-${Date.now()}`, label, color }]);
+  };
+
+  const removeTag = (id: string) => {
+    setTags((list) => list.filter((t) => t.id !== id));
+    setItems((list) => list.map((i) => (i.tags.includes(id) ? { ...i, tags: i.tags.filter((t) => t !== id) } : i)));
+    setHiddenTags((s) => {
+      const next = new Set(s);
+      next.delete(id);
+      return next;
+    });
+  };
+
+  const selected = itemOf(selection);
+
+  const overlay = (() => {
+    if (!dragging) return null;
+    const it = itemOf(dragItemId(dragging));
+    return it ? { title: it.title, priority: it.priority, color: KIND_META[displayKind(it)].color } : null;
+  })();
+
+  return (
+    <DndContext
+      id="calendar-dnd"
+      sensors={sensors}
+      collisionDetection={collision}
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+    >
+      {/* 툴바 */}
+      <div className="flex flex-wrap items-center gap-3 pb-3">
+        <button
+          type="button"
+          onClick={() => setMonth(startOfMonth(parseISO(TODAY)))}
+          className="h-8 rounded-lg border border-line bg-surface px-3 text-[13px] font-medium hover:bg-sunken"
+        >
+          오늘
+        </button>
+        <div className="flex">
+          <button
+            type="button"
+            aria-label="이전 달"
+            onClick={() => setMonth((m) => addMonths(m, -1))}
+            className="grid size-8 place-items-center rounded-md text-muted hover:bg-sunken hover:text-ink"
+          >
+            <ChevronLeft className="size-4.5" />
+          </button>
+          <button
+            type="button"
+            aria-label="다음 달"
+            onClick={() => setMonth((m) => addMonths(m, 1))}
+            className="grid size-8 place-items-center rounded-md text-muted hover:bg-sunken hover:text-ink"
+          >
+            <ChevronRight className="size-4.5" />
+          </button>
+        </div>
+        <h2 className="text-[18px] font-semibold tabular">{fmt(month, "yyyy년 M월")}</h2>
+      </div>
+
+      <div className="pb-4">
+        <TagBar
+          hiddenKinds={hiddenKinds}
+          onToggleKind={(k) => setHiddenKinds((s) => toggleIn(s, k))}
+          tags={tags}
+          hiddenTags={hiddenTags}
+          onToggleTag={(id) => setHiddenTags((s) => toggleIn(s, id))}
+          onAddTag={addTag}
+          onRemoveTag={removeTag}
+        />
+      </div>
+
+      {/* 미배치 할 일 보관함 */}
+      <DropZone
+        id="tray"
+        className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-dashed border-line-strong bg-surface px-3 py-2.5 transition-colors"
+        overClassName="bg-accent-soft border-accent"
+      >
+        <span className="flex shrink-0 items-center gap-1.5 pr-1 text-[12.5px] font-medium text-muted">
+          <Inbox className="size-4" />
+          미배치 <span className="tabular text-faint">{unscheduled.length}</span>
+        </span>
+        {unscheduled.map((i) => (
+          <div key={i.id} className="w-auto max-w-[340px]">
+            <TrayChip item={i} selected={selection === i.id} onSelect={() => setSelection(i.id)} />
+          </div>
+        ))}
+      </DropZone>
+
+      <div className="overflow-hidden rounded-xl border border-line bg-surface shadow-card">
+        <MonthGrid
+          month={month}
+          items={placed}
+          tags={tags}
+          selection={selection}
+          onSelect={setSelection}
+          onResize={resizeItem}
+        />
+      </div>
+
+      <DragOverlay dropAnimation={null}>
+        {overlay && (
+          <div
+            style={toneStyle(overlay.color)}
+            className="tone-bar flex max-w-[240px] items-center gap-1.5 rounded-r-md px-2 py-1.5 text-[12.5px] shadow-pop"
+          >
+            {overlay.priority && <PriorityBadge p={overlay.priority} />}
+            <span className="truncate font-medium">{overlay.title}</span>
+          </div>
+        )}
+      </DragOverlay>
+
+      {selected && (
+        <DetailPanel
+          item={selected}
+          tags={tags}
+          onUpdate={(fn) => update(selected.id, fn)}
+          onClose={() => setSelection(null)}
+        />
+      )}
+
+      {toast && (
+        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-lg bg-ink px-4 py-2.5 text-[13px] text-bg shadow-pop">
+          {toast}
+        </div>
+      )}
+    </DndContext>
+  );
+}

@@ -1,0 +1,268 @@
+# newb-newb 기획 정리 (v0.1 초안)
+
+> 신입이 회사 문서·매뉴얼·조언을 에이전트에게 계속 쌓아 주고, 에이전트는 **"확실히 답할 수 있는지"를 스스로 판단**해서
+> 답하거나, 답하려면 **무엇을 알아와야 하는지**(상사에게 물을 것, 더 필요한 문서)를 알려주는 서비스.
+> 시간이 지날수록 사용자와 손발이 맞는 "같이 일하는 사람"이 되는 것이 목표.
+
+---
+
+## 1. 전제 / 제약
+
+| 항목 | 결정 |
+|---|---|
+| 배포 | `oci-prod` (SSH 호스트로 등록된 OCI 서버) |
+| 프레임워크 | **Next.js 단일** (App Router) |
+| 백엔드 | Next.js 내장 백엔드 = **Route Handlers** (`app/api/**/route.ts`) + **Server Actions** (`"use server"`) — 기억 안 나신다던 게 이거예요. NestJS 없음 |
+| DB | **OCI HeatWave MySQL Always Free** (단일 인스턴스, 스토리지 50GB 수준) |
+| 화면 원칙 | 페이지 설명·안내 문구 같은 메타 텍스트는 넣지 않는다. 앱 왼쪽 사이드바는 접을 수 있다(Ctrl/⌘ + \\) |
+| 클라이언트 | 반응형 웹, **네이티브 앱 없음**. **데스크톱(Windows 포함) = Chrome 최적화**, **iPhone·iPad = Safari 최적화**. 가장 많이 쓰는 데스크톱 웹부터 개발 |
+| 채팅 | **채팅은 무조건 Claude Desktop에서**. 우리 앱엔 채팅 UI 없음 — 질문·판정 파이프라인은 MCP 도구로 제공, 앱은 기록·결과 열람만 |
+| 문서 작업 도구 | 사용자는 **Claude Desktop**에서 문서 작업(ppt, hwp, docx, xlsx…), 우리 앱은 지시·검증·리뷰 담당 |
+
+### 제안 기술 스택 (확정 전)
+- **언어/런타임**: TypeScript, Node 24
+- **UI**: Tailwind CSS + shadcn/ui, 캘린더 드래그는 `dnd-kit`(터치/포인터 이벤트 대응)
+- **ORM**: Drizzle ORM (MySQL) — 마이그레이션 가볍고 서버 액션과 궁합 좋음 (Prisma도 가능)
+- **인증**: Passkey (WebAuthn) — 1인용
+- **LLM**: Anthropic Claude API (모델 라우팅: 분류/판정은 Haiku급, 답변·위키 정리는 Sonnet/Opus급)
+- **MCP 서버**: Next.js Route Handler에 Streamable HTTP MCP 엔드포인트 (`/api/mcp`) — Claude Desktop 커스텀 커넥터로 연결
+- **파일 저장**: OCI Object Storage (원본 문서 보관), DB엔 메타데이터·정리본
+- **스케줄러**: 아침/저녁 브리핑용 cron (서버 crontab → 내부 API 호출, 또는 컨테이너 내 node-cron)
+- **알림**: Web Push (iOS Safari는 **홈 화면에 추가한 PWA**에서만 푸시 가능 → PWA 필수)
+- **배포**: Docker(Next.js `output: "standalone"`) + 리버스 프록시(Caddy/Nginx, HTTPS)
+
+---
+
+## 2. 핵심 개념: 지식 → 판단 → 행동 루프
+
+```
+ [사용자가 가져온 문서/매뉴얼/조언/상사 답변]
+            │  ingest
+            ▼
+   ┌──────────────────┐
+   │    llm-wiki      │  원본(raw) → LLM이 주제별 위키 페이지로 정리·연결·갱신
+   └──────────────────┘
+            │  retrieve (근거 수집)
+            ▼
+   질문 ──► ┌──────────────────┐
+            │  Decision Model  │  "지금 근거로 확답 가능한가?" 판정
+            └──────────────────┘
+          ┌──────┼───────────────┐
+          ▼      ▼               ▼
+       ANSWER  ANSWER+주의     NEED_INFO
+       (확답,  (조건부 답 +    (LLM이 "알아올 것" 생성:
+        출처)   확인 포인트)    상사에게 물을 질문 스크립트,
+                               필요한 문서 목록, 누구에게)
+                                    │
+                사용자가 알아온 답 ──┘──► 다시 llm-wiki에 축적 (루프)
+```
+
+- **성장 메커니즘**: 알아온 답·피드백(👍/👎, "이건 틀렸어")이 위키에 반영되고, 판정 결과가 실제로 맞았는지 기록해 **판정 기준을 보정**. 사용자 작업 스타일(선호 형식, 자주 하는 실수)도 프로필로 누적.
+
+### Decision Model (제안안)
+LLM 하나에 "확실하냐"고 묻는 대신, **판정 근거를 구조화된 점수로 뽑고 규칙으로 결정**하는 하이브리드:
+
+| 신호 | 설명 |
+|---|---|
+| 근거 커버리지 | 질문의 하위 요구사항 중 위키 근거로 뒷받침되는 비율 |
+| 근거 충돌 | 서로 다른 문서/조언이 상충하는지 |
+| 근거 신선도 | 근거 문서가 오래됐거나 "구버전" 표시가 있는지 |
+| 출처 신뢰도 | 공식 매뉴얼 > 상사 직접 답변 > 동료 조언 > 추정 |
+| 행동 위험도 | 틀리면 되돌리기 어려운 일인가 (대외 발송, 결재, 금액 등) |
+| 질문 모호성 | 질문 자체가 해석이 여러 개인가 |
+
+→ 규칙: `위험도 높음 && 커버리지 < 100%` 면 무조건 NEED_INFO 등. 임계값은 사용 기록으로 조정.
+→ 결과마다 **"왜 이렇게 판단했는지"** 를 사용자에게 보여줌 (신입 교육 효과).
+
+---
+
+## 3. 기능 정리
+
+### F0. 항목 / 하위 항목 (2차 QA에서 일정·퀘스트 통합)
+- 일정과 퀘스트를 따로 두지 않고 **항목(Item)** 하나로 관리, 달성률용 체크리스트는 **하위 항목**(1단계만)
+- **유형 3종 고정**: 일정(시간, 완료 체크 없음) / 단순 작업(하위 항목 없음, 완료 체크) / 작업(하위 항목 있음, 달성률 %)
+  - 단순 작업 ↔ 작업은 하위 항목 유무로 **자동 전환**. 사용자가 고르는 건 사실상 "일정이냐 할 일이냐"
+- **자유 태그**(회의·개인·커스텀…)는 유형과 별개로 여러 개 붙임
+- **마감은 유형이 아니라 할 일의 속성(due)** → 캘린더엔 마감 표시로만
+- 할 일의 start/end = "작업할 날·기간"(선택). 없으면 미배치 보관함
+
+### F1. 캘린더 (Notion 캘린더 유사)
+- **월 보기만** (주 보기 없음). 항목은 두 줄(시간·유형·태그 / 제목)로 표시
+- 모든 항목 드래그로 날짜 이동, **좌/우 끝을 끌어 기간(여러 날) 조절** — 여러 날은 막대로 표시 (터치 지원)
+- 유형 필터 + 자유 태그(추가·삭제·색 지정, 보이기/숨기기)
+- 모바일: 일/목록 뷰 중심, 태블릿·데스크톱: 월 보기
+
+### ~~F1-2. 칸반 보드~~ → 1차 QA에서 제외 (필요 없음)
+
+### F2. llm-wiki
+- 화면은 **Next.js 문서 사이트 스타일**: 왼쪽 문서 트리, 가운데 본문, 오른쪽 '이 페이지에서' 목차, 하단 이전/다음
+- 별도 '매뉴얼' 탭 없음 (위키가 곧 매뉴얼)
+- **사람 이름은 화면 어디에도 표시하지 않고 직책(팀장님·선임님 등)으로만 표시**. 이름은 내부 데이터에만 두고 Claude 답변에만 사용
+- **인용 출처 등 세부 레퍼런스도 화면에 공개하지 않음** → `internalNotes`(내부 전용)에 두고 Claude가 MCP로 답할 때만 사용. 위키 화면엔 근거 개수만 표시
+- 망각 곡선은 내부 계산용. 화면엔 유지율·그래프·기억남/헷갈림 없이 **"N일마다 · 다음 복습일"**만 표시
+- **입력**: 파일 업로드(pdf, docx, xlsx, pptx, hwp/hwpx, 이미지), 텍스트 붙여넣기, "상사 조언" 메모, 질문 루프에서 알아온 답
+- **처리**: 원본 보관 → 텍스트 추출 → LLM이 기존 위키 페이지에 병합/신규 페이지 생성, 페이지 간 링크, 변경 이력(log)
+- **조회**: 위키 페이지 브라우징, 검색 (MySQL FULLTEXT + `ngram` 파서로 한글 검색), 질문 시 근거 검색
+- **위키 점검(lint)**: 모순·오래된 내용·고아 페이지 주기적으로 찾아서 사용자에게 확인 요청
+
+### F3. 질문 → 판정 → 답/알아올 것 파이프라인
+- **질문은 Claude Desktop 채팅에서만** 함. Claude가 MCP 도구 `ask_newb(question)` 호출 → 우리 앱이 근거 수집·판정 → 결과를 Claude에 돌려줌
+- 우리 앱에서는 **질문 기록·판정 근거·알아올 것**을 열람만 (채팅 UI 없음)
+- 위 2장의 루프. 답변엔 **출처 링크 필수**
+- NEED_INFO 결과는 "알아올 것" 카드로 생성 → 퀘스트(F4)로 바로 등록 가능
+- 사용자가 답을 가져오면 원 질문에 이어서 재판정
+
+### F4. 목표 성취율 관리 (게임화 X) → F0 항목 모델로 통합
+- **단순 작업** = 완료/미완료
+- **작업** = 하위 항목으로 분해 → **달성률 %** 표시
+- 지시/일정 입력 시 LLM이 단순/일반 분류 + 세부 작업 분해를 **제안**, 사용자가 확정
+- 목적: "할 게 많아 뭐부터 할지 막막함" 해소 → 오늘 할 것 1~3개만 강조
+
+### F5. 우선순위 재배치 (P0~P5)
+- 작업이 쌓이면(또는 사용자가 요청하면) LLM이 마감·의존성·우선순위 기반으로 **재배치안 제시**
+- 대화형으로 상의 → 사용자가 승인한 변경만 캘린더에 반영 (변경 전/후 diff 표시)
+
+### F6. Claude Desktop 연동: 지시 → 검증 → 따라읽기
+> 1차 QA 결정: 앱에 별도 '문서 작업' 메뉴는 두지 않는다. **퀘스트에 Claude 작업 지침만 써 두고**, 결과물·검증·따라읽기는 Claude Desktop 채팅 출력으로 본다. (`submit_draft` 도구 제외)
+
+- 우리 앱이 **MCP 서버**를 제공 → 사용자가 Claude Desktop에 커스텀 커넥터로 등록
+- MCP 도구 예시:
+  - `get_task_brief(task_id)`: 작업 지침·회사 양식·위키 근거 전달
+  - `get_guidelines(topic)`: 관련 가이드라인 조회
+  - ~~`submit_draft`~~ (1차 QA에서 제외 — 결과물은 Claude 채팅에서 확인)
+- 앱에서 **검증**: 지침 대비 체크리스트 자동 점검
+- **따라읽기(walkthrough)**: 결과물의 각 부분에 "어디를 / 왜 이렇게 썼는지 / 알아두면 좋은 것" 주석 → 사용자가 단계별로 읽으며 검토, 배운 점은 위키로
+
+### F7. 대시보드 (아침·저녁 브리핑 통합 — 2차 QA)
+- 별도 브리핑 화면 없음. **아침 브리핑 = 대시보드(`/`)**, **저녁 브리핑 = 다음 날 대시보드의 "어제 정리"**
+- 대시보드: 오늘 할 일·일정, 미리 알아두기, 알아올 것, 오늘 복습할 위키(**복습했음** 버튼), 이번 주 성취율, 어제 정리
+- 복습 간격은 내부 계산(망각 곡선), 화면엔 "N일마다"만
+- 전달: 대시보드 + 아침 Web Push 알림 (시간은 설정에서)
+
+---
+
+## 4. 데이터 모델 초안
+
+```
+users, user_profiles(작업 스타일/선호 누적)
+sources        원본 문서 (파일 경로, 종류, 업로드일, 신뢰등급)
+wiki_pages     정리된 위키 페이지 (제목, 본문 md, 버전, 갱신일)
+wiki_links     페이지 간 링크
+wiki_citations 페이지 ↔ 원본 근거 매핑
+review_items   망각곡선 복습 상태 (다음 복습일, 간격, 난이도)
+questions      질문 + 판정 결과(신호 점수, 결론, 이유)
+info_requests  "알아올 것" (대상: 상사/문서, 상태, 받아온 답)
+items          항목 (kind: event|task, start/end/allDay, due, priority, status, from, waiting_for, brief)
+sub_items      하위 항목 (item_id, title, done, sort)
+tags           자유 태그 (label, color) / item_tags (item_id, tag_id)
+people         사람 (이름 + 직책) — 화면엔 직책만, 이름은 Claude 답변용
+reschedule_proposals  재배치 제안 + 승인 상태
+daily_digests  대시보드용 하루 정리 (전날 저녁 생성)
+feedback       답변/판정에 대한 사용자 피드백
+```
+
+---
+
+## 5. Safari 대응 체크리스트
+- `100dvh` 사용 (iOS 주소창 높이 변화), `env(safe-area-inset-*)` 노치 대응
+- 입력창 `font-size ≥ 16px` (자동 확대 방지)
+- PWA manifest + 홈 화면 추가 안내 (iOS 웹 푸시 조건)
+- 드래그앤드롭은 포인터 이벤트 기반 라이브러리 사용, 길게 눌러 드래그
+- `<input type="date">` 대신 커스텀 피커 고려 (iOS 표시 차이)
+- 실제 기기(iPhone/iPad Safari) + 데스크톱 Safari에서 QA
+
+---
+
+## 6. 단계별 로드맵 (제안)
+
+| 단계 | 범위 | 완료 기준 |
+|---|---|---|
+| P0 기반 | 프로젝트 셋업, 인증, DB 연결, 반응형 레이아웃, PWA, oci-prod 배포 파이프라인 | 로그인 후 빈 대시보드가 oci-prod HTTPS로 뜸 |
+| P1 퀘스트·캘린더 | F1, F4 | 퀘스트 생성/분해/진척률, 캘린더 드래그 |
+| P2 llm-wiki | F2 | 문서 올리면 위키 페이지 생성·검색 |
+| P3 질문 파이프라인 | F3 | 판정 결과 3종 + 알아올 것 → 퀘스트 연결 |
+| P4 브리핑 | F7 | 아침/저녁 자동 생성 + 푸시 |
+| P5 우선순위 재배치 | F5 | 재배치안 대화 → 승인 반영 |
+| P6 Claude Desktop | F6 | MCP 연결, 지시·제출·검증·따라읽기 |
+
+---
+
+## 7. 리스크 / 확인 필요
+- **사내 문서를 외부 LLM API로 보내도 되는지** (보안 정책) — 제일 먼저 확인 필요
+- **hwp**: Claude Desktop이 hwp를 직접 만들긴 어려움. hwpx(XML 기반)는 상대적으로 가능, hwp 원본 파싱도 라이브러리 품질이 제한적
+- **OCI Always Free MySQL**: 벡터 검색은 HeatWave 기능 의존 → 초기엔 FULLTEXT(ngram) + LLM 위키 인덱스 방식으로 시작, 필요 시 임베딩 추가
+- **iOS 푸시**: 홈 화면 설치 안 하면 알림 불가
+- **Claude Desktop 커스텀 커넥터**: 공개 HTTPS 주소 + 인증(OAuth) 필요, 플랜/조직 설정에 따라 사용 가능 여부 다름
+
+---
+
+## 8. 인터뷰 결정사항 (2026-10-30)
+
+| 항목 | 결정 | 설계 영향 |
+|---|---|---|
+| 사용자 범위 | **나 혼자 (1인용)** | 멀티테넌시·권한 체계 없음. 단, 테이블엔 `user_id` 두어 확장 여지만 남김 |
+| 사내 문서 외부 전송 | **허용** | Claude API 바로 사용. 마스킹 단계 불필요 |
+| Decision model | **모델 비종속 인터페이스로 추상화** (입출력 고정) | 아래 8-1 참고. 구현체 교체 가능 (LLM 점수+규칙 → 추후 학습 모델 등) |
+| 캘린더 | **앱 내부만** | 외부 동기화 없음 |
+| Claude Desktop 연동 | **원격 MCP 서버** | `/api/mcp` 공개 HTTPS + OAuth 필요 → 공개 도메인 필수 |
+| 결과물 회수 | ~~submit_draft 제출~~ → **Claude Desktop 채팅 출력으로 확인** (1차 QA 변경) | 앱엔 퀘스트별 작업 지침만 저장 |
+| hwp | **보류 (검토 중)** | 후보: ① 사용자가 hwpx로 변환 후 작업 ② Claude in Chrome/Computer Use로 웹 한글에서 작업. MVP에선 읽기(텍스트 추출)만 |
+| 서버 | oci-prod 확인 완료 | 아래 8-2 참고 |
+| 도메인 | `maekr.cloud` (Cloudflare) 서브도메인 — **나중에 결정** | Tailscale만 쓰면 Claude Desktop 원격 MCP가 접근 불가 → MCP 단계(P6) 전엔 공개 도메인 필요 |
+| 브리핑 시간 | **앱에서 설정** | 사용자 설정 테이블 + 스케줄러가 매 분/5분마다 "보낼 시간 된 브리핑" 확인 |
+| 로그인 | **Passkey** (WebAuthn) | HTTPS + 고정 도메인 필요 (RP ID). 로컬 개발은 localhost로 가능 |
+
+### 8-1. Decision Model 인터페이스 (초안)
+
+```ts
+// 입력: 질문 + 수집된 근거 + 맥락
+interface DecisionInput {
+  question: string;
+  evidence: Array<{
+    sourceId: string;
+    excerpt: string;
+    sourceType: "manual" | "guideline" | "boss_answer" | "peer_advice" | "note";
+    updatedAt: string;
+  }>;
+  context?: { relatedQuestId?: string; userProfile?: Record<string, unknown> };
+}
+
+// 출력: 판정 + 이유 + (필요 시) 알아올 것
+interface DecisionOutput {
+  verdict: "ANSWER" | "ANSWER_WITH_CAVEAT" | "NEED_INFO";
+  confidence: number;            // 0~1
+  signals: Record<string, number>; // 커버리지, 충돌, 신선도, 위험도, 모호성 등 (구현체별 자유)
+  rationale: string;             // 사용자에게 보여줄 판단 이유
+  missing?: Array<{
+    kind: "ask_person" | "find_document" | "clarify_question";
+    target?: string;             // 예: "팀장님", "보안 가이드라인 최신본"
+    what: string;                // 무엇을 알아와야 하는지
+    suggestedScript?: string;    // 상사에게 물을 때 쓸 문장
+  }>;
+}
+
+interface DecisionModel {
+  id: string;
+  decide(input: DecisionInput): Promise<DecisionOutput>;
+}
+```
+- 첫 구현체: `LlmSignalRuleModel` (LLM이 signals 추출 → 규칙으로 verdict 결정)
+- 모든 판정과 이후 피드백을 저장 → 나중에 구현체 교체·비교(A/B) 가능
+
+### 8-2. oci-prod 서버 현황
+- **ARM64 (aarch64)**, 2코어, RAM 7.7GB, 디스크 48GB(여유 35GB), Ubuntu 26.04
+- Docker 사용 중, 기존 `ken-blog` 스택 (api + **Caddy가 80/443 점유**), Tailscale 연결됨
+- 배포 방식: Next.js `standalone` 이미지를 **arm64로 빌드** → 컨테이너 1개 추가 (127.0.0.1 바인딩) → 기존 Caddy에 사이트 블록 추가
+- 주의: 서버에서 `next build`는 메모리를 많이 씀 → 로컬/CI에서 arm64 이미지 빌드 후 전송 권장
+
+### 8-3. 화면 QA용 주석 (Agentation)
+- 앱 오른쪽 아래 Agentation 툴바로 화면 요소에 주석을 달면 Claude Code가 MCP(`agentation`)로 바로 읽음
+- **로그인한 사용자에게만** 툴바 표시, 주석은 같은 주소의 `/api/agentation/*` 프록시로 보내고 서버에서 다시 로그인 확인 → 주석 서버(4747)는 외부에 직접 노출하지 않음
+- 모든 기기(Windows·Mac·iPhone·iPad)에서 동일하게 동작
+- 환경변수 `AGENTATION_URL` (기본 `http://localhost:4747`). oci-prod 배포 시 Claude Code가 도는 oci-dev 주소(Tailscale)로 지정
+- 현재 로그인은 임시(`src/lib/auth.ts`): 개발 모드 = 로그인됨, 프로덕션 = 비로그인. Passkey 붙이면 교체
+
+### 8-4. 남은 열린 질문
+- hwp 작성 방식 최종 결정
+- 도메인 서브도메인 이름 (예: `newb.maekr.cloud`)
+- LLM 모델 조합 및 월 예산 상한

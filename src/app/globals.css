@@ -1,0 +1,233 @@
+@import "tailwindcss";
+
+/* ───────── 디자인 토큰 ───────── */
+:root {
+  --bg: #fbfbfa;
+  --surface: #ffffff;
+  --sidebar: #f4f3f0;
+  --sunken: #f4f3f0;
+  --line: #e9e7e2;
+  --line-strong: #d9d6cf;
+  --ink: #1e1e1b;
+  --muted: #73726c;
+  --faint: #a3a29c;
+  --accent: #3e63dd;
+  --accent-ink: #2b4bb8;
+  --accent-soft: #edf1fd;
+
+  --ok: #2f9e6a;
+  --ok-soft: #e7f6ee;
+  --warn: #c27c0e;
+  --warn-soft: #fdf4e3;
+  --danger: #dc3d43;
+  --danger-soft: #fdecec;
+  --info: #7b5cd6;
+  --info-soft: #f2eefc;
+
+  /* 우선순위 P0(가장 급함) ~ P5 */
+  --p0: #dc3d43;
+  --p1: #e5641b;
+  --p2: #c27c0e;
+  --p3: #2f9e6a;
+  --p4: #2a7fd4;
+  --p5: #85847e;
+
+  /* 일정 종류 */
+  --ev-meeting: #3e63dd;
+  --ev-focus: #7b5cd6;
+  --ev-quest: #2f9e6a;
+  --ev-personal: #85847e;
+  --ev-deadline: #dc3d43;
+
+  --shadow-card: 0 1px 2px rgb(20 20 18 / 0.04), 0 1px 1px rgb(20 20 18 / 0.03);
+  --shadow-pop: 0 8px 28px rgb(20 20 18 / 0.12), 0 2px 6px rgb(20 20 18 / 0.06);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #141413;
+    --surface: #1c1c1a;
+    --sidebar: #181816;
+    --sunken: #222220;
+    --line: #2c2c29;
+    --line-strong: #3a3a36;
+    --ink: #ecece8;
+    --muted: #9b9a94;
+    --faint: #6c6b66;
+    --accent: #7c9bff;
+    --accent-ink: #a5baff;
+    --accent-soft: #1f2645;
+
+    --ok: #4cc38a;
+    --ok-soft: #15291f;
+    --warn: #f1a10d;
+    --warn-soft: #2e2410;
+    --danger: #ff6369;
+    --danger-soft: #331617;
+    --info: #a78bfa;
+    --info-soft: #251d3d;
+
+    --p0: #ff6369;
+    --p1: #ff8b3e;
+    --p2: #f1a10d;
+    --p3: #4cc38a;
+    --p4: #5eb1ef;
+    --p5: #9b9a94;
+
+    --ev-meeting: #7c9bff;
+    --ev-focus: #a78bfa;
+    --ev-quest: #4cc38a;
+    --ev-personal: #9b9a94;
+    --ev-deadline: #ff6369;
+
+    --shadow-card: 0 0 0 1px rgb(255 255 255 / 0.02);
+    --shadow-pop: 0 10px 30px rgb(0 0 0 / 0.5);
+  }
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-sidebar: var(--sidebar);
+  --color-sunken: var(--sunken);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-soft: var(--accent-soft);
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --shadow-card: var(--shadow-card);
+  --shadow-pop: var(--shadow-pop);
+  --font-sans: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", "Malgun Gothic", sans-serif;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-feature-settings: "ss05", "tnum" 0;
+  letter-spacing: -0.005em;
+}
+
+/* 숫자 정렬용 */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Windows Chrome 스크롤바를 얇게 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+/* 우선순위·일정 색을 한 곳에서 관리하기 위한 변수 주입 클래스 */
+.tone-P0 { --tone: var(--p0); }
+.tone-P1 { --tone: var(--p1); }
+.tone-P2 { --tone: var(--p2); }
+.tone-P3 { --tone: var(--p3); }
+.tone-P4 { --tone: var(--p4); }
+.tone-P5 { --tone: var(--p5); }
+.tone-meeting { --tone: var(--ev-meeting); }
+.tone-focus { --tone: var(--ev-focus); }
+.tone-quest { --tone: var(--ev-quest); }
+.tone-personal { --tone: var(--ev-personal); }
+.tone-deadline { --tone: var(--ev-deadline); }
+
+.tone-chip {
+  color: var(--tone);
+  background: color-mix(in srgb, var(--tone) 12%, transparent);
+}
+.tone-dot {
+  background: var(--tone);
+}
+.tone-bar {
+  border-left: 3px solid var(--tone);
+  background: color-mix(in srgb, var(--tone) 10%, var(--surface));
+}
+@media (prefers-color-scheme: dark) {
+  .tone-bar {
+    background: color-mix(in srgb, var(--tone) 20%, var(--surface));
+  }
+}
+.tone-text {
+  color: var(--tone);
+}
+
+/* 위키 본문 (간단한 마크다운 렌더 결과) */
+.prose-wiki h2 {
+  font-size: 1.05rem;
+  font-weight: 650;
+  margin: 1.6rem 0 0.6rem;
+}
+.prose-wiki h2:first-child {
+  margin-top: 0;
+}
+.prose-wiki p {
+  margin: 0.5rem 0;
+  line-height: 1.75;
+}
+.prose-wiki ul,
+.prose-wiki ol {
+  margin: 0.5rem 0;
+  padding-left: 1.3rem;
+  line-height: 1.75;
+}
+.prose-wiki ul { list-style: disc; }
+.prose-wiki ol { list-style: decimal; }
+.prose-wiki li::marker { color: var(--faint); }
+.prose-wiki blockquote {
+  margin: 0.8rem 0;
+  padding: 0.6rem 0.9rem;
+  border-left: 3px solid var(--accent);
+  background: var(--accent-soft);
+  border-radius: 0 8px 8px 0;
+  color: var(--ink);
+}
+.prose-wiki code {
+  font-size: 0.85em;
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  background: var(--sunken);
+}
+.prose-wiki strong { font-weight: 650; }
+.prose-wiki a { color: var(--accent-ink); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: color-mix(in srgb, var(--accent) 40%, transparent); }
+
+/* 여러 날 일정 막대 배경 */
+.tone-chip-soft {
+  background: color-mix(in srgb, var(--tone) 14%, var(--surface));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tone) 22%, transparent);
+}
+@media (prefers-color-scheme: dark) {
+  .tone-chip-soft {
+    background: color-mix(in srgb, var(--tone) 26%, var(--surface));
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tone) 40%, transparent);
+  }
+}
+
+/* 항목 유형 3종 색 (일정 / 단순 작업 / 작업) */
+:root {
+  --kind-event: #3e63dd;
+  --kind-simple: #2f9e6a;
+  --kind-task: #7b5cd6;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --kind-event: #7c9bff;
+    --kind-simple: #4cc38a;
+    --kind-task: #a78bfa;
+  }
+}
