@@ -1,6 +1,6 @@
 import clsx from "clsx";
-import type { DisplayKind, Priority, Verdict } from "@/lib/types";
-import { KIND_META } from "@/lib/items";
+import type { DisplayKind, ItemStatus, Priority, Verdict } from "@/lib/types";
+import { KIND_META, statusColor, statusLabel } from "@/lib/items";
 
 /** 페이지 공통 헤더 */
 export function PageHeader({
@@ -127,6 +127,19 @@ export function KindTag({ kind }: { kind: DisplayKind }) {
       className="tone-chip inline-flex h-[20px] items-center rounded-[5px] px-1.5 text-[11.5px] font-semibold"
     >
       {m.label}
+    </span>
+  );
+}
+
+/** 진행 상태 배지 (할 일만) */
+export function StatusBadge({ status }: { status: ItemStatus }) {
+  return (
+    <span
+      style={{ "--tone": statusColor[status] } as React.CSSProperties}
+      className="tone-chip inline-flex h-[20px] items-center gap-1 rounded-full px-2 text-[11.5px] font-medium whitespace-nowrap"
+    >
+      <span className="tone-dot size-1.5 rounded-full" />
+      {statusLabel[status]}
     </span>
   );
 }

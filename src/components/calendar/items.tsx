@@ -4,7 +4,7 @@ import clsx from "clsx";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { GripVertical } from "lucide-react";
 import type { Item } from "@/lib/types";
-import { KIND_META, displayKind, type Tag } from "@/lib/items";
+import { KIND_META, displayKind, type Tag, statusColor, statusLabel } from "@/lib/items";
 import { PriorityBadge } from "@/components/ui";
 import { isMultiDay, toneStyle, type CalItem, type Edge } from "./model";
 
@@ -126,8 +126,15 @@ export function ItemChip({
           )}
         </span>
       </span>
-      <span className={clsx("mt-0.5 block truncate text-[12.5px] font-medium text-ink", done && "line-through")}>
-        {item.title}
+      <span className={clsx("mt-0.5 flex items-center gap-1.5 text-[12.5px] font-medium text-ink", done && "line-through")}>
+        {item.kind === "task" && item.status && (
+          <span
+            className="size-1.5 shrink-0 rounded-full"
+            style={{ background: statusColor[item.status] }}
+            title={statusLabel[item.status]}
+          />
+        )}
+        <span className="truncate">{item.title}</span>
       </span>
       {onResizeStart && capRight && (
         <ResizeHandle side="right" visible={selected} onStart={(ev) => onResizeStart("end", ev)} />

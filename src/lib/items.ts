@@ -43,6 +43,8 @@ export const PRIORITY_ORDER: Priority[] = ["P0", "P1", "P2", "P3", "P4", "P5"];
 export const byPriority = (a: Item, b: Item) =>
   PRIORITY_ORDER.indexOf(a.priority ?? "P5") - PRIORITY_ORDER.indexOf(b.priority ?? "P5");
 
+export const STATUSES: ItemStatus[] = ["todo", "doing", "waiting", "done"];
+
 export const statusLabel: Record<ItemStatus, string> = {
   todo: "할 일",
   doing: "진행 중",
@@ -51,7 +53,7 @@ export const statusLabel: Record<ItemStatus, string> = {
 };
 
 export const statusColor: Record<ItemStatus, string> = {
-  todo: "var(--faint)",
+  todo: "var(--muted)",
   doing: "var(--accent)",
   waiting: "var(--info)",
   done: "var(--ok)",

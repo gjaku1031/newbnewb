@@ -59,7 +59,7 @@ export function RescheduleView() {
             <span>
               <b>{acceptedCount}건</b> 반영
             </span>
-            <Link href="/calendar" className="ml-auto font-medium underline underline-offset-2">
+            <Link href="/tasks" className="ml-auto font-medium underline underline-offset-2">
               캘린더 보기
             </Link>
           </div>
@@ -84,7 +84,7 @@ export function RescheduleView() {
           </span>
           <div className="flex gap-2">
             <Link
-              href="/calendar"
+              href="/tasks"
               className="inline-flex h-9 items-center rounded-lg px-3.5 text-[14px] font-medium text-muted hover:bg-sunken hover:text-ink"
             >
               나중에

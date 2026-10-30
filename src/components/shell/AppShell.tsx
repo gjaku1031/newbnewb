@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import clsx from "clsx";
 import {
   BookOpen,
-  CalendarDays,
+  ListChecks,
   MessageCircleQuestion,
   Settings,
   Sun,
@@ -46,7 +46,7 @@ function setCollapsedStored(v: boolean) {
 
 const NAV = [
   { href: "/", label: "오늘", icon: Sun },
-  { href: "/calendar", label: "캘린더", icon: CalendarDays },
+  { href: "/tasks", label: "작업", icon: ListChecks },
   { href: "/wiki", label: "위키", icon: BookOpen },
   { href: "/questions", label: "질문 기록", icon: MessageCircleQuestion },
 ];

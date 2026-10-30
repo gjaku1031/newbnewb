@@ -5,7 +5,7 @@ import Link from "next/link";
 import clsx from "clsx";
 import { ArrowRight, Check, Clock, Hourglass, MapPin, Plus, RotateCcw, X } from "lucide-react";
 import type { Item, SubItem } from "@/lib/types";
-import { displayKind, progress, statusLabel, type Tag } from "@/lib/items";
+import { PRIORITY_ORDER, STATUSES, displayKind, progress, statusColor, statusLabel, type Tag } from "@/lib/items";
 import { KindTag, PriorityBadge, ProgressRing } from "@/components/ui";
 import { dueLabel, dueTone, fmt } from "@/lib/date";
 import { toneStyle } from "./model";
@@ -49,7 +49,6 @@ export function DetailPanel({
         <div className="flex flex-wrap items-center gap-1.5">
           <KindTag kind={kind} />
           {isTask && item.priority && <PriorityBadge p={item.priority} />}
-          {isTask && item.status && <span className="text-[12px] text-muted">{statusLabel[item.status]}</span>}
         </div>
         <button
           type="button"
@@ -91,7 +90,42 @@ export function DetailPanel({
           </dl>
 
           {isTask && (
-            <dl className="mt-3 grid grid-cols-[56px_1fr] gap-y-1.5 text-[13px]">
+            <dl className="mt-3 grid grid-cols-[56px_1fr] items-center gap-y-2 text-[13px]">
+              <dt className="text-muted">진행</dt>
+              <dd className="flex flex-wrap gap-1">
+                {STATUSES.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => onUpdate((i) => ({ ...i, status: s }))}
+                    style={toneStyle(statusColor[s])}
+                    className={clsx(
+                      "inline-flex h-6 items-center gap-1 rounded-full border px-2 text-[12px]",
+                      item.status === s ? "tone-chip border-transparent font-semibold" : "border-line text-muted hover:text-ink",
+                    )}
+                  >
+                    <span className="tone-dot size-1.5 rounded-full" />
+                    {statusLabel[s]}
+                  </button>
+                ))}
+              </dd>
+              <dt className="text-muted">우선순위</dt>
+              <dd className="flex flex-wrap gap-1">
+                {PRIORITY_ORDER.map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => onUpdate((i) => ({ ...i, priority: p }))}
+                    className={clsx(
+                      `tone-${p}`,
+                      "h-6 rounded-[5px] px-1.5 text-[11.5px] font-semibold tabular",
+                      item.priority === p ? "tone-chip" : "text-faint hover:text-muted",
+                    )}
+                  >
+                    {p}
+                  </button>
+                ))}
+              </dd>
               {item.due && (
                 <>
                   <dt className="text-muted">마감</dt>

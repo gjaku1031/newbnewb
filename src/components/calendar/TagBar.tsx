@@ -3,8 +3,8 @@
 import { useState } from "react";
 import clsx from "clsx";
 import { Plus, X } from "lucide-react";
-import type { DisplayKind } from "@/lib/types";
-import { KIND_META, TAG_COLORS, type Tag } from "@/lib/items";
+import type { DisplayKind, ItemStatus } from "@/lib/types";
+import { KIND_META, STATUSES, TAG_COLORS, statusColor, statusLabel, type Tag } from "@/lib/items";
 import { toneStyle } from "./model";
 
 const KINDS: DisplayKind[] = ["event", "simple", "task"];
@@ -53,6 +53,8 @@ function Chip({
 export function TagBar({
   hiddenKinds,
   onToggleKind,
+  hiddenStatus,
+  onToggleStatus,
   tags,
   hiddenTags,
   onToggleTag,
@@ -61,6 +63,8 @@ export function TagBar({
 }: {
   hiddenKinds: Set<DisplayKind>;
   onToggleKind: (k: DisplayKind) => void;
+  hiddenStatus: Set<ItemStatus>;
+  onToggleStatus: (s: ItemStatus) => void;
   tags: Tag[];
   hiddenTags: Set<string>;
   onToggleTag: (id: string) => void;
@@ -90,6 +94,18 @@ export function TagBar({
             color={KIND_META[k].color}
             off={hiddenKinds.has(k)}
             onToggle={() => onToggleKind(k)}
+          />
+        ))}
+      </div>
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="mr-1 text-[12px] font-medium text-faint">진행</span>
+        {STATUSES.map((s) => (
+          <Chip
+            key={s}
+            label={statusLabel[s]}
+            color={statusColor[s]}
+            off={hiddenStatus.has(s)}
+            onToggle={() => onToggleStatus(s)}
           />
         ))}
       </div>

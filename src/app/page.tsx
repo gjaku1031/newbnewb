@@ -179,8 +179,8 @@ export default function DashboardPage() {
               <CardTitle
                 icon={<CalendarClock className="size-4" />}
                 right={
-                  <Link href="/calendar" className="flex items-center gap-1 text-[13px] text-muted hover:text-ink">
-                    캘린더 <ArrowRight className="size-3.5" />
+                  <Link href="/tasks" className="flex items-center gap-1 text-[13px] text-muted hover:text-ink">
+                    작업 <ArrowRight className="size-3.5" />
                   </Link>
                 }
               >

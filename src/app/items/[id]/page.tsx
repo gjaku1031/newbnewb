@@ -74,7 +74,7 @@ export default async function ItemPage(props: PageProps<"/items/[id]">) {
         <dt className="text-muted">{isTodo ? "작업할 날" : "시간"}</dt>
         <dd className="tabular">
           {when ? (
-            <Link href="/calendar" className="hover:underline">
+            <Link href="/tasks" className="hover:underline">
               {when}
             </Link>
           ) : (

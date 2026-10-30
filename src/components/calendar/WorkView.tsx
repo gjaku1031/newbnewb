@@ -15,8 +15,9 @@ import {
   type DragStartEvent,
 } from "@dnd-kit/core";
 import { addMonths, parseISO, startOfMonth } from "date-fns";
-import { ChevronLeft, ChevronRight, Inbox } from "lucide-react";
-import type { DisplayKind, Item } from "@/lib/types";
+import { CalendarDays, ChevronLeft, ChevronRight, Eye, EyeOff, Inbox, Table2 } from "lucide-react";
+import clsx from "clsx";
+import type { DisplayKind, Item, ItemStatus } from "@/lib/types";
 import { DEFAULT_TAGS, KIND_META, displayKind, type Tag } from "@/lib/items";
 import { fmt } from "@/lib/date";
 import { items as initialItems } from "@/mocks/items";
@@ -24,6 +25,7 @@ import { TODAY } from "@/mocks/today";
 import { PriorityBadge } from "@/components/ui";
 import { DropZone, TrayChip } from "./items";
 import { MonthGrid } from "./MonthGrid";
+import { TableView } from "./TableView";
 import { DetailPanel } from "./DetailPanel";
 import { TagBar } from "./TagBar";
 import {
@@ -47,7 +49,12 @@ const collision: CollisionDetection = (args) => {
   return hit.length ? hit : rectIntersection(args);
 };
 
-export function CalendarView() {
+type View = "calendar" | "table";
+
+/** "작업" 화면: 같은 데이터·필터로 캘린더 / 데이터베이스(표) 보기 전환 (둘 다 월별) */
+export function WorkView() {
+  const [view, setView] = useState<View>("calendar");
+  const [hiddenStatus, setHiddenStatus] = useState<Set<ItemStatus>>(new Set());
   const [month, setMonth] = useState<Date>(() => startOfMonth(parseISO(TODAY)));
   const [items, setItems] = useState<Item[]>(initialItems);
   const [tags, setTags] = useState<Tag[]>(DEFAULT_TAGS);
@@ -68,10 +75,26 @@ export function CalendarView() {
   const itemOf = (id?: string | null) => (id ? items.find((i) => i.id === id) : undefined);
 
   /** 유형·태그 필터: 유형이 숨겨졌거나, 붙은 태그 중 하나라도 숨겨졌으면 안 보임 */
-  const isVisible = (i: Item) => !hiddenKinds.has(displayKind(i)) && !i.tags.some((t) => hiddenTags.has(t));
+  const isVisible = (i: Item) =>
+    !hiddenKinds.has(displayKind(i)) &&
+    !i.tags.some((t) => hiddenTags.has(t)) &&
+    !(i.kind === "task" && i.status && hiddenStatus.has(i.status));
+  const hideDone = hiddenStatus.has("done");
+
+  // 표 보기: 이번 달에 걸친 항목 + 날짜는 없지만 마감이 이번 달인 할 일
+  const monthKey = fmt(month, "yyyy-MM");
+  const inMonth = (i: Item) => {
+    if (i.start) {
+      const s = i.start.slice(0, 7);
+      const e = (i.end ?? i.start).slice(0, 7);
+      return s <= monthKey && e >= monthKey;
+    }
+    return !!i.due && i.due.slice(0, 7) === monthKey;
+  };
+  const tableRows = items.filter(isVisible).filter(inMonth);
 
   const placed = items.filter(isPlaced).filter(isVisible).map(asCal);
-  const unscheduled = items.filter((i) => i.kind === "task" && !i.start && i.status !== "done");
+  const unscheduled = items.filter((i) => i.kind === "task" && !i.start && isVisible(i) && i.status !== "done");
 
   const flash = (msg: string) => {
     setToast(msg);
@@ -203,12 +226,54 @@ export function CalendarView() {
           </button>
         </div>
         <h2 className="text-[18px] font-semibold tabular">{fmt(month, "yyyy년 M월")}</h2>
+
+        <div className="ml-auto flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setHiddenStatus((s) => toggleIn(s, "done" as ItemStatus))}
+            aria-pressed={hideDone}
+            className={clsx(
+              "inline-flex h-8 items-center gap-1.5 rounded-lg border px-3 text-[13px] font-medium transition-colors",
+              hideDone
+                ? "border-accent/40 bg-accent-soft text-accent-ink"
+                : "border-line bg-surface text-muted hover:text-ink",
+            )}
+          >
+            {hideDone ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+            완료 숨기기
+          </button>
+          <div role="tablist" className="flex rounded-lg bg-sunken p-0.5">
+            {(
+              [
+                { id: "calendar", label: "캘린더", icon: CalendarDays },
+                { id: "table", label: "데이터베이스", icon: Table2 },
+              ] as const
+            ).map(({ id, label, icon: Icon }) => (
+              <button
+                key={id}
+                type="button"
+                role="tab"
+                aria-selected={view === id}
+                onClick={() => setView(id)}
+                className={clsx(
+                  "inline-flex h-7 items-center gap-1.5 rounded-md px-3 text-[13px] font-medium",
+                  view === id ? "bg-surface text-ink shadow-card" : "text-muted hover:text-ink",
+                )}
+              >
+                <Icon className="size-3.5" />
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       <div className="pb-4">
         <TagBar
           hiddenKinds={hiddenKinds}
           onToggleKind={(k) => setHiddenKinds((s) => toggleIn(s, k))}
+          hiddenStatus={hiddenStatus}
+          onToggleStatus={(st) => setHiddenStatus((s) => toggleIn(s, st))}
           tags={tags}
           hiddenTags={hiddenTags}
           onToggleTag={(id) => setHiddenTags((s) => toggleIn(s, id))}
@@ -217,33 +282,43 @@ export function CalendarView() {
         />
       </div>
 
-      {/* 미배치 할 일 보관함 */}
-      <DropZone
-        id="tray"
-        className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-dashed border-line-strong bg-surface px-3 py-2.5 transition-colors"
-        overClassName="bg-accent-soft border-accent"
-      >
-        <span className="flex shrink-0 items-center gap-1.5 pr-1 text-[12.5px] font-medium text-muted">
-          <Inbox className="size-4" />
-          미배치 <span className="tabular text-faint">{unscheduled.length}</span>
-        </span>
-        {unscheduled.map((i) => (
-          <div key={i.id} className="w-auto max-w-[340px]">
-            <TrayChip item={i} selected={selection === i.id} onSelect={() => setSelection(i.id)} />
-          </div>
-        ))}
-      </DropZone>
+      {view === "calendar" && (
+        <>
+          {/* 미배치 할 일 보관함 */}
+          <DropZone
+            id="tray"
+            className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-dashed border-line-strong bg-surface px-3 py-2.5 transition-colors"
+            overClassName="bg-accent-soft border-accent"
+          >
+            <span className="flex shrink-0 items-center gap-1.5 pr-1 text-[12.5px] font-medium text-muted">
+              <Inbox className="size-4" />
+              미배치 <span className="tabular text-faint">{unscheduled.length}</span>
+            </span>
+            {unscheduled.map((i) => (
+              <div key={i.id} className="w-auto max-w-[340px]">
+                <TrayChip item={i} selected={selection === i.id} onSelect={() => setSelection(i.id)} />
+              </div>
+            ))}
+          </DropZone>
 
-      <div className="overflow-hidden rounded-xl border border-line bg-surface shadow-card">
-        <MonthGrid
-          month={month}
-          items={placed}
-          tags={tags}
-          selection={selection}
-          onSelect={setSelection}
-          onResize={resizeItem}
-        />
-      </div>
+          <div className="overflow-hidden rounded-xl border border-line bg-surface shadow-card">
+            <MonthGrid
+              month={month}
+              items={placed}
+              tags={tags}
+              selection={selection}
+              onSelect={setSelection}
+              onResize={resizeItem}
+            />
+          </div>
+        </>
+      )}
+
+      {view === "table" && (
+        <div className="overflow-hidden rounded-xl border border-line bg-surface shadow-card">
+          <TableView items={tableRows} tags={tags} selection={selection} onSelect={setSelection} onUpdate={update} />
+        </div>
+      )}
 
       <DragOverlay dropAnimation={null}>
         {overlay && (
