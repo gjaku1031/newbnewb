@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # newb 인프라를 한 번에 세팅 — oci-dev(OCI CLI·oci-prod SSH 설정된 곳)의 레포에서 실행
 #
-#   1. MySQL 관리자 비밀번호 재설정 (OCI CLI) → ~/.config/newb/mysql-admin.env 에만 저장
+#   1. MySQL 관리자 정보: ~/.config/ken-prod/mysql-admin.env (2026-10-30부터 kenadmin) — 없을 때만 비밀번호 재설정
 #      · ken-blog는 앱 계정(kenblog_live)으로 접속해서 영향 없음
 #      · 이미 mysql-admin.env 가 있으면 재설정하지 않고 그 값을 씀
 #   2. oci-prod에서 newb DB + 전용 계정 newb 생성 → oci-prod:/srv/newb/newb.env
@@ -15,7 +15,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 CONF="$HOME/.config/newb"
-ADMIN_ENV="$CONF/mysql-admin.env"
+ADMIN_ENV="$HOME/.config/ken-prod/mysql-admin.env"   # 공용 MySQL 관리자 (kenadmin)
 DB_SYSTEM_NAME=${DB_SYSTEM_NAME:-ken-prod}
 ADMIN_USER_GIVEN=${ADMIN_USER:-}
 ADMIN_USER=${ADMIN_USER:-admin}

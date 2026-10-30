@@ -5,7 +5,7 @@ newb는 **새 서버를 만들지 않고** 이미 있는 무료 자원을 나눠
 | 자원 | 방식 | 무료 한도 |
 |---|---|---|
 | 앱 서버 | `oci-prod` VM에 컨테이너로 추가 (ken-blog와 같은 Caddy 뒤) | VM 무료 한도(4코어·24GB·200GB)는 이미 다 사용 중 → 새 VM 없음 |
-| MySQL | 공용 MySQL `ken-prod`(MySQL.Free, 옛 이름 ken-blog-mysql) **안에** `newb` DB + 전용 사용자 추가 | MySQL.Free는 계정당 1대, 스토리지 50GB를 ken-blog와 공유 |
+| MySQL | 공용 MySQL `ken-prod`(MySQL.Free, 26.10.0) **안에** `newb` DB + 전용 사용자 추가 — 관리자 `kenadmin` | MySQL.Free는 계정당 1대, 스토리지 50GB를 ken-blog와 공유 |
 | 파일 저장 | Object Storage 버킷 `newb-files` (비공개) + **서버 인증**(비밀키 없음) | Object Storage 전체 20GB · 월 5만 요청 (ken-blog 버킷과 합산) |
 
 ## 한 번에 실행 — `bootstrap.sh` (권장)
@@ -54,8 +54,15 @@ ssh -t oci-prod bash /tmp/setup-mysql.sh
 
 | 파일 | 내용 |
 |---|---|
-| `oci-dev:~/.config/newb/mysql-admin.env` | MySQL 관리자 아이디·비밀번호 (평소엔 쓰지 않음) |
+| `oci-dev:~/.config/ken-prod/mysql-admin.env` | 공용 MySQL 관리자 `kenadmin` (평소엔 쓰지 않음, 설명은 같은 폴더 README.txt) |
 | `oci-prod:/srv/newb/newb.env` | `DB_HOST` `DB_PORT` `DB_NAME` `DB_USER` `DB_PASSWORD` `DATABASE_URL` |
 | `oci-prod:/srv/newb/object-storage.env` | `OCI_AUTH` `OCI_REGION` `OCI_NAMESPACE` `OCI_BUCKET` (비밀값 없음) |
 
 비밀값 파일은 git에 올리지 않습니다 (`.gitignore`에 `*.env`). 앱 컨테이너는 `env_file`로 두 파일을 읽습니다.
+
+## 2026-10-30 공용 MySQL 재생성 기록
+
+관리자 계정 이름을 아무도 몰라서(OCI는 생성 후 관리자 이름을 보여주지 않음) DB 서버를 새로 만들었다. 자세한 절차: [rebuild-ken-prod.md](rebuild-ken-prod.md)
+
+- 결과: `ken-prod` · MySQL 26.10.0 · 같은 IP 10.0.0.47 · 같은 TLS 인증서(BYOC) · 관리자 `kenadmin`
+- ken-blog: 18:22~19:42 UTC 중단, 18:22 덤프로 데이터 복구, 계정 `kenblog_live`는 같은 비밀번호·접속 위치·권한으로 재생성 → 정상

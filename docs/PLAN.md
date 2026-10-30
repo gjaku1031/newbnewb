@@ -272,8 +272,8 @@ interface DecisionModel {
 - 주의: 서버에서 `next build`는 메모리를 많이 씀 → 로컬/CI에서 arm64 이미지 빌드 후 전송 권장
 
 ### 8-2-1. DB·파일 저장 (Always Free, 2026-10-30)
-- MySQL: 새 서버 없이 공용 `ken-prod`(MySQL.Free, 10.0.0.47, 옛 이름 ken-blog-mysql — 여러 앱이 써서 이름 변경) **안에** `newb` DB + 전용 사용자 `newb`(TLS 필수, newb DB만)
-- 파일: Object Storage 버킷 `newb-files`(비공개) + **서버 인증**(동적 그룹 newb-prod = oci-prod만, 정책은 이 버킷만) — 비밀키 없음
+- MySQL: 새 서버 없이 공용 `ken-prod`(MySQL.Free 26.10.0, 10.0.0.47 — 여러 앱이 써서 ken-blog-mysql에서 이름 변경, 10-30 관리자 `kenadmin`으로 재생성) **안에** `newb` DB + 전용 사용자 `newb`(TLS 필수, newb DB만, oci-prod에서만) — **생성 완료**
+- 파일: Object Storage 버킷 `newb-files`(비공개) + **서버 인증**(동적 그룹 newb-prod = oci-prod만, 정책은 이 버킷만) — 비밀키 없음 — **생성 완료**
 - 세팅 스크립트·비밀값 위치: [infra/oci/README.md](../infra/oci/README.md) — MySQL 관리자 비밀번호는 저장돼 있지 않아 사용자가 직접 입력
 
 ### 8-3. 화면 QA용 주석 (Agentation)

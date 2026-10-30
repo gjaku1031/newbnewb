@@ -31,8 +31,14 @@ read -rp "MySQL 관리자 아이디: " ADMIN_USER
 read -rsp "MySQL 관리자 비밀번호: " ADMIN_PW
 echo
 
-# 영문·숫자 32자 (URL에 그대로 넣어도 안전)
-NEWB_PW=$(openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | cut -c1-32)
+# 32자: 대·소문자·숫자·특수문자(-, _) 각 1개 이상 — MySQL 비밀번호 정책 충족, URL에 그대로 넣어도 안전
+NEWB_PW=$(python3 -c '
+import secrets, string
+sp = "-_"
+while True:
+    p = "".join(secrets.choice(string.ascii_letters + string.digits + sp) for _ in range(32))
+    if any(c.islower() for c in p) and any(c.isupper() for c in p) and any(c.isdigit() for c in p) and any(c in sp for c in p):
+        print(p); break')
 
 # 비밀번호는 docker 명령줄이 아니라 환경변수로만 넘긴다 (ps에 안 보이게)
 mysql_as() { # $1=사용자 $2=비밀번호 나머지=mysql 인자
