@@ -45,7 +45,7 @@ ssh -t oci-prod bash /tmp/setup-mysql.sh
 
 만드는 것
 - 데이터베이스 `newb` (utf8mb4)
-- 사용자 `newb` — TLS 필수, `newb` DB에만 권한
+- 사용자 `newb` — TLS 필수, `newb` DB에만 권한, oci-prod(10.0.0.132)에서만 접속 (ken-blog 계정과 같은 방식)
 - 접속 정보 → `oci-prod:/srv/newb/newb.env` (권한 600)
 
 다시 실행하면 `newb` 사용자 비밀번호를 새로 바꾸고 파일도 갱신합니다.

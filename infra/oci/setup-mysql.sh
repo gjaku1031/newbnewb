@@ -3,7 +3,7 @@
 #
 # 새 MySQL 서버를 만들지 않는다. ken-blog가 쓰는 무료 MySQL(MySQL.Free, 계정당 1대) 안에
 #   - 데이터베이스 newb (utf8mb4)
-#   - 전용 사용자 newb (TLS 필수, newb DB에만 권한)
+#   - 전용 사용자 newb (TLS 필수, newb DB에만 권한, oci-prod 사설 IP에서만 접속)
 # 를 추가한다. 추가 비용 없음, 50GB 스토리지는 ken-blog와 나눠 씀.
 #
 # MySQL 관리자 아이디·비밀번호를 물어본다 (화면·명령줄·로그에 남기지 않음).
@@ -18,6 +18,8 @@ DB_HOST=${DB_HOST:-10.0.0.47}
 DB_PORT=${DB_PORT:-3306}
 DB_NAME=${DB_NAME:-newb}
 DB_USER=${DB_USER:-newb}
+# 접속 허용 위치: ken-blog(kenblog_live)처럼 운영 서버(oci-prod) 사설 IP에서만
+DB_USER_HOST=${DB_USER_HOST:-10.0.0.132}
 OUT_DIR=${OUT_DIR:-/srv/newb}
 OUT="$OUT_DIR/newb.env"
 IMG=${MYSQL_IMAGE:-mysql:8.4.11}
@@ -42,9 +44,9 @@ mysql_as() { # $1=사용자 $2=비밀번호 나머지=mysql 인자
 echo "▶ ${DB_HOST}:${DB_PORT} 에 ${DB_NAME} DB · ${DB_USER} 사용자 만드는 중"
 mysql_as "$ADMIN_USER" "$ADMIN_PW" <<SQL
 CREATE DATABASE IF NOT EXISTS \`${DB_NAME}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
-CREATE USER IF NOT EXISTS '${DB_USER}'@'%' IDENTIFIED BY '${NEWB_PW}' REQUIRE SSL;
-ALTER USER '${DB_USER}'@'%' IDENTIFIED BY '${NEWB_PW}' REQUIRE SSL;
-GRANT ALL PRIVILEGES ON \`${DB_NAME}\`.* TO '${DB_USER}'@'%';
+CREATE USER IF NOT EXISTS '${DB_USER}'@'${DB_USER_HOST}' IDENTIFIED BY '${NEWB_PW}' REQUIRE SSL;
+ALTER USER '${DB_USER}'@'${DB_USER_HOST}' IDENTIFIED BY '${NEWB_PW}' REQUIRE SSL;
+GRANT ALL PRIVILEGES ON \`${DB_NAME}\`.* TO '${DB_USER}'@'${DB_USER_HOST}';
 SQL
 unset ADMIN_PW
 
