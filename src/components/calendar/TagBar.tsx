@@ -4,7 +4,7 @@ import { useState } from "react";
 import clsx from "clsx";
 import { Plus, X } from "lucide-react";
 import type { DisplayKind, ItemStatus } from "@/lib/types";
-import { KIND_META, STATUSES, TAG_COLORS, statusColor, statusLabel, type Tag } from "@/lib/items";
+import { KIND_META, STATUSES, statusColor, statusLabel, type Tag } from "@/lib/items";
 import { toneStyle } from "./model";
 
 const KINDS: DisplayKind[] = ["event", "simple", "task"];
@@ -76,14 +76,24 @@ export function TagBar({
 }) {
   const [adding, setAdding] = useState(false);
   const [label, setLabel] = useState("");
-  const [color, setColor] = useState(TAG_COLORS[0]);
+  const [color, setColor] = useState("#6e56cf");
 
+  /** 새 태그 색은 무작위로 시작 (선택기로 바꿀 수 있음) */
+  const open = () => {
+    const h = Math.floor(Math.random() * 360);
+    setColor(hslToHex(h, 62, 52));
+    setLabel("");
+    setAdding(true);
+  };
+  const close = () => {
+    setLabel("");
+    setAdding(false);
+  };
   const submit = () => {
     const name = label.trim();
     if (!name) return;
     onAddTag(name, color);
-    setLabel("");
-    setAdding(false);
+    close();
   };
 
   return (
@@ -128,42 +138,54 @@ export function TagBar({
           />
         ))}
         {adding ? (
-          <span className="inline-flex h-8 items-center gap-1.5 rounded-full border border-line bg-surface pr-1 pl-2.5 shadow-card">
+          <span className="inline-flex h-9 items-center gap-1.5 rounded-full border border-line bg-surface pr-1 pl-1.5 shadow-card lg:h-8">
+            {/* 색 선택기 (RGB) */}
+            <label
+              className="relative grid size-6 shrink-0 cursor-pointer place-items-center rounded-full ring-1 ring-line"
+              style={{ background: color }}
+              title="색 고르기"
+            >
+              <input
+                type="color"
+                aria-label="태그 색"
+                value={color}
+                onChange={(e) => setColor(e.target.value)}
+                className="absolute inset-0 size-full cursor-pointer opacity-0"
+              />
+            </label>
             <input
               autoFocus
               value={label}
               onChange={(e) => setLabel(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter") submit();
-                if (e.key === "Escape") setAdding(false);
+                if (e.key === "Escape") close();
               }}
               placeholder="태그 이름"
-              className="w-24 bg-transparent text-[13px] outline-none placeholder:text-faint"
+              style={{ color }}
+              className="w-28 bg-transparent text-[16px] font-medium outline-none placeholder:font-normal placeholder:text-faint lg:text-[13px]"
             />
-            <span className="flex items-center gap-1">
-              {TAG_COLORS.map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  aria-label={`색 ${c}`}
-                  onClick={() => setColor(c)}
-                  className={clsx("size-3.5 rounded-full", color === c && "ring-2 ring-offset-1 ring-offset-surface")}
-                  style={{ background: c, ["--tw-ring-color" as string]: c } as React.CSSProperties}
-                />
-              ))}
-            </span>
             <button
               type="button"
               onClick={submit}
-              className="h-6 rounded-full bg-accent px-2.5 text-[12px] font-medium text-white hover:bg-accent-ink"
+              disabled={!label.trim()}
+              className="h-7 rounded-full bg-accent px-3 text-[12.5px] font-medium text-white hover:bg-accent-ink disabled:opacity-40 lg:h-6 lg:px-2.5 lg:text-[12px]"
             >
               추가
+            </button>
+            <button
+              type="button"
+              onClick={close}
+              aria-label="닫기"
+              className="grid size-7 place-items-center rounded-full text-muted hover:bg-sunken hover:text-ink lg:size-6"
+            >
+              <X className="size-3.5" />
             </button>
           </span>
         ) : (
           <button
             type="button"
-            onClick={() => setAdding(true)}
+            onClick={open}
             className="inline-flex h-7 items-center gap-1 rounded-full border border-dashed border-line-strong px-2.5 text-[12.5px] text-muted hover:border-faint hover:text-ink"
           >
             <Plus className="size-3.5" /> 태그
@@ -172,4 +194,17 @@ export function TagBar({
       </div>
     </div>
   );
+}
+
+/** HSL → #rrggbb */
+function hslToHex(h: number, s: number, l: number) {
+  const a = (s / 100) * Math.min(l / 100, 1 - l / 100);
+  const f = (n: number) => {
+    const k = (n + h / 30) % 12;
+    const c = l / 100 - a * Math.max(-1, Math.min(k - 3, 9 - k, 1));
+    return Math.round(c * 255)
+      .toString(16)
+      .padStart(2, "0");
+  };
+  return `#${f(0)}${f(8)}${f(4)}`;
 }

@@ -27,7 +27,6 @@ export const DEFAULT_TAGS: Tag[] = [
   { id: "onboarding", label: "온보딩", color: "#2a7fd4" },
   { id: "personal", label: "개인", color: "#85847e" },
 ];
-export const TAG_COLORS = ["#e5641b", "#c27c0e", "#2f9e6a", "#12a594", "#2a7fd4", "#7b5cd6", "#d6409f", "#85847e"];
 
 export const isTodo = (i: Item) => i.kind === "task";
 export const isDone = (i: Item) => i.kind === "task" && i.status === "done";
