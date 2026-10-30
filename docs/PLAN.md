@@ -271,6 +271,11 @@ interface DecisionModel {
 - 배포 방식: Next.js `standalone` 이미지를 **arm64로 빌드** → 컨테이너 1개 추가 (127.0.0.1 바인딩) → 기존 Caddy에 사이트 블록 추가
 - 주의: 서버에서 `next build`는 메모리를 많이 씀 → 로컬/CI에서 arm64 이미지 빌드 후 전송 권장
 
+### 8-2-1. DB·파일 저장 (Always Free, 2026-10-30)
+- MySQL: 새 서버 없이 ken-blog의 `ken-blog-mysql`(MySQL.Free, 10.0.0.47) **안에** `newb` DB + 전용 사용자 `newb`(TLS 필수, newb DB만)
+- 파일: Object Storage 버킷 `newb-files`(비공개, S3 호환) + 버킷 전용 IAM 사용자 `newb-app`
+- 세팅 스크립트·비밀값 위치: [infra/oci/README.md](../infra/oci/README.md) — MySQL 관리자 비밀번호는 저장돼 있지 않아 사용자가 직접 입력
+
 ### 8-3. 화면 QA용 주석 (Agentation)
 - 앱 오른쪽 아래 Agentation 툴바로 화면 요소에 주석을 달면 Claude Code가 MCP(`agentation`)로 바로 읽음
 - **로그인한 사용자에게만** 툴바 표시, 주석은 같은 주소의 `/api/agentation/*` 프록시로 보내고 서버에서 다시 로그인 확인 → 주석 서버(4747)는 외부에 직접 노출하지 않음
