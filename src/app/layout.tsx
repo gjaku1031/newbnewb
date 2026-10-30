@@ -3,6 +3,7 @@ import "pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css";
 import "./globals.css";
 import { AppShell } from "@/components/shell/AppShell";
 import { AgentationToolbar } from "@/components/dev/AgentationToolbar";
+import { QuickMemo } from "@/components/memo/QuickMemo";
 
 export const metadata: Metadata = {
   title: "newb — 신입과 함께 일하는 에이전트",
@@ -25,6 +26,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-full">
         <AppShell>{children}</AppShell>
         {/* 로그인한 사용자에게만 표시 (컴포넌트 안에서 확인) */}
+        <QuickMemo />
         <AgentationToolbar />
       </body>
     </html>

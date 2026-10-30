@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import clsx from "clsx";
 import {
   BookOpen,
+  NotebookPen,
   ListChecks,
   MessageCircleQuestion,
   Settings,
@@ -48,6 +49,7 @@ const NAV = [
   { href: "/", label: "오늘", icon: Sun },
   { href: "/tasks", label: "작업", icon: ListChecks },
   { href: "/wiki", label: "위키", icon: BookOpen },
+  { href: "/memos", label: "메모", icon: NotebookPen },
   { href: "/questions", label: "질문 기록", icon: MessageCircleQuestion },
 ];
 

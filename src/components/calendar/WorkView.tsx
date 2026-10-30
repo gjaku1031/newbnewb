@@ -15,12 +15,20 @@ import {
   type DragStartEvent,
 } from "@dnd-kit/core";
 import { addMonths, parseISO, startOfMonth } from "date-fns";
-import { CalendarDays, ChevronLeft, ChevronRight, Eye, EyeOff, Inbox, Table2 } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, Eye, EyeOff, Inbox, Plus, Table2 } from "lucide-react";
 import clsx from "clsx";
 import type { DisplayKind, Item, ItemStatus } from "@/lib/types";
-import { DEFAULT_TAGS, KIND_META, displayKind, type Tag } from "@/lib/items";
+import { KIND_META, displayKind } from "@/lib/items";
 import { fmt } from "@/lib/date";
-import { items as initialItems } from "@/mocks/items";
+import {
+  addTag as storeAddTag,
+  deleteItem,
+  removeTag as storeRemoveTag,
+  updateItem,
+  useItems,
+  useTags,
+} from "@/lib/itemStore";
+import { NewItemDialog } from "@/components/item/NewItemDialog";
 import { TODAY } from "@/mocks/today";
 import { PriorityBadge } from "@/components/ui";
 import { DropZone, TrayChip } from "./items";
@@ -56,8 +64,10 @@ export function WorkView() {
   const [view, setView] = useState<View>("calendar");
   const [hiddenStatus, setHiddenStatus] = useState<Set<ItemStatus>>(new Set());
   const [month, setMonth] = useState<Date>(() => startOfMonth(parseISO(TODAY)));
-  const [items, setItems] = useState<Item[]>(initialItems);
-  const [tags, setTags] = useState<Tag[]>(DEFAULT_TAGS);
+  const items = useItems();
+  const tags = useTags();
+  /** 새 항목 창: null = 닫힘, "" = 날짜 없이, "YYYY-MM-DD" = 그 날짜로 */
+  const [creating, setCreating] = useState<string | null>(null);
   const [hiddenTags, setHiddenTags] = useState<Set<string>>(new Set());
   const [hiddenKinds, setHiddenKinds] = useState<Set<DisplayKind>>(new Set());
   const [selection, setSelection] = useState<Selection>(null);
@@ -101,7 +111,7 @@ export function WorkView() {
     window.setTimeout(() => setToast(null), 2200);
   };
 
-  const update = (id: string, fn: (i: Item) => Item) => setItems((list) => list.map((i) => (i.id === id ? fn(i) : i)));
+  const update = (id: string, fn: (i: Item) => Item) => updateItem(id, fn);
 
   const onDragStart = (e: DragStartEvent) => {
     const id = String(e.active.id);
@@ -168,13 +178,10 @@ export function WorkView() {
     return next;
   };
 
-  const addTag = (label: string, color: string) => {
-    setTags((t) => [...t, { id: `tag-${Date.now()}`, label, color }]);
-  };
+  const addTag = (label: string, color: string) => storeAddTag(label, color);
 
   const removeTag = (id: string) => {
-    setTags((list) => list.filter((t) => t.id !== id));
-    setItems((list) => list.map((i) => (i.tags.includes(id) ? { ...i, tags: i.tags.filter((t) => t !== id) } : i)));
+    storeRemoveTag(id);
     setHiddenTags((s) => {
       const next = new Set(s);
       next.delete(id);
@@ -228,6 +235,13 @@ export function WorkView() {
         <h2 className="text-[18px] font-semibold tabular">{fmt(month, "yyyy년 M월")}</h2>
 
         <div className="ml-auto flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setCreating("")}
+            className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-accent px-3 text-[13px] font-medium text-white hover:bg-accent-ink"
+          >
+            <Plus className="size-4" /> 새 항목
+          </button>
           <button
             type="button"
             onClick={() => setHiddenStatus((s) => toggleIn(s, "done" as ItemStatus))}
@@ -309,6 +323,7 @@ export function WorkView() {
               selection={selection}
               onSelect={setSelection}
               onResize={resizeItem}
+              onCreateAt={(d) => setCreating(d)}
             />
           </div>
         </>
@@ -316,7 +331,14 @@ export function WorkView() {
 
       {view === "table" && (
         <div className="overflow-hidden rounded-xl border border-line bg-surface shadow-card">
-          <TableView items={tableRows} tags={tags} selection={selection} onSelect={setSelection} onUpdate={update} />
+          <TableView
+            items={tableRows}
+            tags={tags}
+            selection={selection}
+            onSelect={setSelection}
+            onUpdate={update}
+            onCreate={() => setCreating("")}
+          />
         </div>
       )}
 
@@ -337,7 +359,23 @@ export function WorkView() {
           item={selected}
           tags={tags}
           onUpdate={(fn) => update(selected.id, fn)}
+          onDelete={() => {
+            deleteItem(selected.id);
+            setSelection(null);
+            flash(`'${selected.title}' 삭제`);
+          }}
           onClose={() => setSelection(null)}
+        />
+      )}
+
+      {creating !== null && (
+        <NewItemDialog
+          date={creating || undefined}
+          onClose={() => setCreating(null)}
+          onCreated={(id) => {
+            setCreating(null);
+            setSelection(id);
+          }}
         />
       )}
 

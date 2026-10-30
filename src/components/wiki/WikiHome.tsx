@@ -6,6 +6,7 @@ import { TODAY } from "@/mocks/today";
 import { sources, wikiPages } from "@/mocks/wiki";
 import { FileIcon, IntervalPill, SourceTypeBadge } from "./badges";
 import { wikiChapters } from "./structure";
+import { PendingPanel } from "./PendingPanel";
 
 const issueMeta = {
   conflict: { label: "근거 충돌", icon: AlertTriangle, cls: "text-danger" },
@@ -36,6 +37,8 @@ export function WikiHome() {
 
   return (
     <div className="space-y-10">
+      <PendingPanel />
+
       {/* 장 카드 */}
       <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
         {chapters.map((c) => (

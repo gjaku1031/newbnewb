@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import clsx from "clsx";
-import { ArrowDown, ArrowUp } from "lucide-react";
+import { ArrowDown, ArrowUp, Plus } from "lucide-react";
 import type { Item, ItemStatus, Priority } from "@/lib/types";
 import {
   PRIORITY_ORDER,
@@ -51,7 +51,7 @@ function CellSelect<T extends string>({
         aria-label={label}
         value={value ?? ""}
         onChange={(e) => onChange(e.target.value as T)}
-        className="absolute inset-0 cursor-pointer opacity-0"
+        className="absolute inset-0 cursor-pointer text-base opacity-0"
       >
         {options.map((o) => (
           <option key={o.value} value={o.value}>
@@ -70,12 +70,14 @@ export function TableView({
   selection,
   onSelect,
   onUpdate,
+  onCreate,
 }: {
   items: Item[];
   tags: Tag[];
   selection: string | null;
   onSelect: (id: string) => void;
   onUpdate: (id: string, fn: (i: Item) => Item) => void;
+  onCreate: () => void;
 }) {
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: "date", dir: 1 });
 
@@ -118,8 +120,23 @@ export function TableView({
     </th>
   );
 
+  const newRow = (
+    <button
+      type="button"
+      onClick={onCreate}
+      className="flex w-full items-center gap-1.5 px-4 py-2.5 text-left text-[13.5px] text-faint hover:bg-sunken/60 hover:text-ink"
+    >
+      <Plus className="size-4" /> 새 항목
+    </button>
+  );
+
   if (rows.length === 0) {
-    return <div className="px-6 py-14 text-center text-[13.5px] text-muted">이번 달 항목이 없어요</div>;
+    return (
+      <div>
+        <div className="px-6 py-12 text-center text-[13.5px] text-muted">이번 달 항목이 없어요</div>
+        <div className="border-t border-line">{newRow}</div>
+      </div>
+    );
   }
 
   return (
@@ -231,6 +248,7 @@ export function TableView({
           })}
         </tbody>
       </table>
+      <div className="border-t border-line">{newRow}</div>
     </div>
   );
 }

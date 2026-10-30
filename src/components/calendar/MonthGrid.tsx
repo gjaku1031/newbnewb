@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import clsx from "clsx";
+import { Plus } from "lucide-react";
 import { addDays, isSameMonth, startOfMonth, startOfWeek } from "date-fns";
 import type { Tag } from "@/lib/items";
 import { TODAY } from "@/mocks/today";
@@ -18,10 +19,11 @@ import {
   type Selection,
 } from "./model";
 
-const WEEKDAYS = ["월", "화", "수", "목", "금", "토", "일"];
-const MAX_ITEMS = 3;
+const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
 const HEAD_H = 32;
 const LANE_H = 44;
+/** 태그 줄이 있는 막대가 있는 주는 레인을 높인다 */
+const LANE_H_TAGS = 64;
 const WEEK_MIN_H = 156;
 
 type Resizing = { id: string; edge: Edge; date: string } | null;
@@ -34,6 +36,7 @@ export function MonthGrid({
   selection,
   onSelect,
   onResize,
+  onCreateAt,
 }: {
   month: Date;
   /** 캘린더에 놓인(보이는) 항목 */
@@ -42,12 +45,13 @@ export function MonthGrid({
   selection: Selection;
   onSelect: (id: string) => void;
   onResize: (id: string, edge: Edge, date: string) => void;
+  /** 그 날짜로 새 항목 만들기 */
+  onCreateAt: (date: string) => void;
 }) {
-  const [expanded, setExpanded] = useState<string | null>(null);
   const [resizing, setResizing] = useState<Resizing>(null);
   const latest = useRef<Resizing>(null);
 
-  const gridStart = startOfWeek(startOfMonth(month), { weekStartsOn: 1 });
+  const gridStart = startOfWeek(startOfMonth(month), { weekStartsOn: 0 });
   const weekCount = isSameMonth(addDays(gridStart, 35), month) ? 6 : 5;
   const weeks = Array.from({ length: weekCount }, (_, w) =>
     Array.from({ length: 7 }, (_, d) => addDays(gridStart, w * 7 + d)),
@@ -62,7 +66,6 @@ export function MonthGrid({
     const init = { id: i.id, edge, date: edge === "start" ? startDay(i) : endDay(i) };
     latest.current = init;
     setResizing(init);
-    onSelect(i.id);
 
     const move = (pe: PointerEvent) => {
       const d = dateAtPoint(pe.clientX, pe.clientY);
@@ -90,7 +93,13 @@ export function MonthGrid({
       <div className="min-w-[880px]">
         <div className="grid grid-cols-7 border-b border-line">
           {WEEKDAYS.map((w, i) => (
-            <div key={w} className={clsx("px-3 py-2 text-[12.5px] font-medium", i >= 5 ? "text-faint" : "text-muted")}>
+            <div
+              key={w}
+              className={clsx(
+                "px-3 py-2 text-[12.5px] font-medium",
+                i === 0 ? "text-danger" : i === 6 ? "text-faint" : "text-muted",
+              )}
+            >
               {w}
             </div>
           ))}
@@ -117,14 +126,15 @@ export function MonthGrid({
             return { i, cs, ce, lane, capLeft: startDay(i) >= ws, capRight: endDay(i) <= we };
           });
           const lanes = laneEnds.length;
-          const restMin = Math.max(48, WEEK_MIN_H - HEAD_H - lanes * LANE_H);
+          const laneH = spans.some((i) => i.tags.some((t) => tags.some((x) => x.id === t))) ? LANE_H_TAGS : LANE_H;
+          const restMin = Math.max(48, WEEK_MIN_H - HEAD_H - lanes * laneH);
 
           return (
             <div
               key={ws}
               className="grid grid-cols-7 border-b border-line last:border-b-0"
               style={{
-                gridTemplateRows: [`${HEAD_H}px`, ...Array(lanes).fill(`${LANE_H}px`), `minmax(${restMin}px, auto)`].join(
+                gridTemplateRows: [`${HEAD_H}px`, ...Array(lanes).fill(`${laneH}px`), `minmax(${restMin}px, auto)`].join(
                   " ",
                 ),
               }}
@@ -138,11 +148,12 @@ export function MonthGrid({
                     key={`bg-${key}`}
                     id={`day:${key}`}
                     date={key}
+                    onDoubleClick={() => onCreateAt(key)}
                     style={{ gridColumn: c + 1, gridRow: "1 / -1" }}
                     className={clsx(
                       "transition-colors",
                       c !== 0 && "border-l border-line",
-                      c >= 5 && "bg-sunken/30",
+                      (c === 0 || c === 6) && "bg-sunken/30",
                       !inMonth && "bg-sunken/60",
                       resizing && resizing.date === key && "bg-accent-soft/80",
                     )}
@@ -158,17 +169,27 @@ export function MonthGrid({
                   <div
                     key={`h-${key}`}
                     style={{ gridColumn: c + 1, gridRow: 1 }}
-                    className="pointer-events-none px-2.5 pt-1.5"
+                    className="group/day relative z-[1] flex items-start justify-between px-2.5 pt-1.5"
+                    onDoubleClick={() => onCreateAt(key)}
                   >
                     <span
                       className={clsx(
                         "grid h-6 w-fit min-w-6 place-items-center rounded-full px-1 text-[12.5px] font-medium tabular",
                         key === TODAY && "bg-accent text-white",
-                        key !== TODAY && !inMonth && "text-faint",
+                        key !== TODAY && c === 0 && (inMonth ? "text-danger" : "text-danger/50"),
+                        key !== TODAY && c !== 0 && !inMonth && "text-faint",
                       )}
                     >
                       {d.getDate() === 1 ? `${d.getMonth() + 1}월 1일` : d.getDate()}
                     </span>
+                    <button
+                      type="button"
+                      aria-label={`${key} 새 항목`}
+                      onClick={() => onCreateAt(key)}
+                      className="grid size-6 place-items-center rounded-md text-faint opacity-0 group-hover/day:opacity-100 focus:opacity-100 hover:bg-sunken hover:text-ink"
+                    >
+                      <Plus className="size-3.5" />
+                    </button>
                   </div>
                 );
               })}
@@ -199,17 +220,14 @@ export function MonthGrid({
                 const dayItems = shown
                   .filter((i) => !isMultiDay(i) && startDay(i) === key)
                   .sort((a, b) => Number(!!b.allDay) - Number(!!a.allDay) || a.start.localeCompare(b.start));
-                const isOpen = expanded === key;
-                const limit = isOpen ? Infinity : Math.max(1, MAX_ITEMS - lanes);
-                const visible = dayItems.slice(0, limit);
-                const hidden = dayItems.length - visible.length;
                 return (
                   <div
                     key={`c-${key}`}
+                    onDoubleClick={(e) => e.target === e.currentTarget && onCreateAt(key)}
                     style={{ gridColumn: c + 1, gridRow: lanes + 2 }}
                     className={clsx("relative z-[1] space-y-1 px-1.5 pt-[3px] pb-1.5", !inMonth && "opacity-60")}
                   >
-                    {visible.map((i) => (
+                    {dayItems.map((i) => (
                       <ItemChip
                         key={i.id}
                         item={i}
@@ -219,15 +237,6 @@ export function MonthGrid({
                         onResizeStart={(edge) => startResize(i, edge)}
                       />
                     ))}
-                    {(hidden > 0 || isOpen) && (
-                      <button
-                        type="button"
-                        onClick={() => setExpanded(isOpen ? null : key)}
-                        className="px-1.5 text-[11.5px] font-medium text-muted hover:text-ink"
-                      >
-                        {isOpen ? "접기" : `+${hidden}개 더`}
-                      </button>
-                    )}
                   </div>
                 );
               })}

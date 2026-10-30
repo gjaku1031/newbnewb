@@ -11,6 +11,11 @@ import { getWikiPage } from "@/mocks/wiki";
 /** ## 제목 앵커 id (본문 렌더와 '이 페이지에서' 목차가 같은 규칙을 쓴다) */
 const headingId = (n: number) => `sec-${n}`;
 
+/** 마크다운 기호를 걷어낸 한 줄 (주석 위치 맞추기용) */
+export function plainLine(line: string) {
+  return plainText(line.replace(/^\s*(#{1,6}\s|>\s?|-\s|\d+\.\s)/, ""));
+}
+
 /** 목차용: 본문의 ## 제목 목록 */
 export function extractHeadings(source: string): { id: string; text: string }[] {
   return source
@@ -66,7 +71,7 @@ export function Markdown({ source, className }: { source: string; className?: st
     }
     if (line.startsWith("## ")) {
       blocks.push(
-        <h2 key={i} id={headingId(h++)} className="scroll-mt-6">
+        <h2 key={i} id={headingId(h++)} className="scroll-mt-6" data-line={i}>
           {inline(line.slice(3), `h${i}`)}
         </h2>,
       );
@@ -75,17 +80,25 @@ export function Markdown({ source, className }: { source: string; className?: st
     }
     if (line.startsWith("> ")) {
       const buf: string[] = [];
+      const from = i;
       while (i < lines.length && lines[i].startsWith("> ")) buf.push(lines[i++].slice(2));
-      blocks.push(<blockquote key={`q${i}`}>{inline(buf.join(" "), `q${i}`)}</blockquote>);
+      blocks.push(
+        <blockquote key={`q${i}`} data-line={from}>
+          {inline(buf.join(" "), `q${i}`)}
+        </blockquote>,
+      );
       continue;
     }
     if (/^- /.test(line)) {
       const items: string[] = [];
+      const from = i;
       while (i < lines.length && /^- /.test(lines[i])) items.push(lines[i++].slice(2));
       blocks.push(
         <ul key={`u${i}`}>
           {items.map((t, k) => (
-            <li key={k}>{inline(t, `u${i}-${k}`)}</li>
+            <li key={k} data-line={from + k}>
+              {inline(t, `u${i}-${k}`)}
+            </li>
           ))}
         </ul>,
       );
@@ -93,17 +106,24 @@ export function Markdown({ source, className }: { source: string; className?: st
     }
     if (/^\d+\. /.test(line)) {
       const items: string[] = [];
+      const from = i;
       while (i < lines.length && /^\d+\. /.test(lines[i])) items.push(lines[i++].replace(/^\d+\. /, ""));
       blocks.push(
         <ol key={`o${i}`}>
           {items.map((t, k) => (
-            <li key={k}>{inline(t, `o${i}-${k}`)}</li>
+            <li key={k} data-line={from + k}>
+              {inline(t, `o${i}-${k}`)}
+            </li>
           ))}
         </ol>,
       );
       continue;
     }
-    blocks.push(<p key={i}>{inline(line, `p${i}`)}</p>);
+    blocks.push(
+      <p key={i} data-line={i}>
+        {inline(line, `p${i}`)}
+      </p>,
+    );
     i++;
   }
   return <div className={className ?? "prose-wiki"}>{blocks}</div>;

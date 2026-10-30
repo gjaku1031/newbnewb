@@ -15,10 +15,13 @@ function Chip({
   off,
   onToggle,
   onRemove,
+  dot = true,
 }: {
   label: string;
   color: string;
   off: boolean;
+  /** 유형·진행은 점 표시, 태그는 점 없이 색 배경+글자만 */
+  dot?: boolean;
   onToggle: () => void;
   onRemove?: () => void;
 }) {
@@ -32,7 +35,7 @@ function Chip({
       )}
     >
       <button type="button" onClick={onToggle} className="flex items-center gap-1.5" aria-pressed={!off}>
-        <span className={clsx("size-2 rounded-full", off ? "bg-line-strong" : "tone-dot")} />
+        {dot && <span className={clsx("size-2 rounded-full", off ? "bg-line-strong" : "tone-dot")} />}
         {label}
       </button>
       {onRemove && (
@@ -84,30 +87,32 @@ export function TagBar({
   };
 
   return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-      <div className="flex flex-wrap items-center gap-1.5">
-        <span className="mr-1 text-[12px] font-medium text-faint">유형</span>
-        {KINDS.map((k) => (
-          <Chip
-            key={k}
-            label={KIND_META[k].label}
-            color={KIND_META[k].color}
-            off={hiddenKinds.has(k)}
-            onToggle={() => onToggleKind(k)}
-          />
-        ))}
-      </div>
-      <div className="flex flex-wrap items-center gap-1.5">
-        <span className="mr-1 text-[12px] font-medium text-faint">진행</span>
-        {STATUSES.map((s) => (
-          <Chip
-            key={s}
-            label={statusLabel[s]}
-            color={statusColor[s]}
-            off={hiddenStatus.has(s)}
-            onToggle={() => onToggleStatus(s)}
-          />
-        ))}
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="mr-1 text-[12px] font-medium text-faint">유형</span>
+          {KINDS.map((k) => (
+            <Chip
+              key={k}
+              label={KIND_META[k].label}
+              color={KIND_META[k].color}
+              off={hiddenKinds.has(k)}
+              onToggle={() => onToggleKind(k)}
+            />
+          ))}
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="mr-1 text-[12px] font-medium text-faint">진행</span>
+          {STATUSES.map((s) => (
+            <Chip
+              key={s}
+              label={statusLabel[s]}
+              color={statusColor[s]}
+              off={hiddenStatus.has(s)}
+              onToggle={() => onToggleStatus(s)}
+            />
+          ))}
+        </div>
       </div>
       <div className="flex flex-wrap items-center gap-1.5">
         <span className="mr-1 text-[12px] font-medium text-faint">태그</span>
@@ -117,6 +122,7 @@ export function TagBar({
             label={t.label}
             color={t.color}
             off={hiddenTags.has(t.id)}
+            dot={false}
             onToggle={() => onToggleTag(t.id)}
             onRemove={() => onRemoveTag(t.id)}
           />

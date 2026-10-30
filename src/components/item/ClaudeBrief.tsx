@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
 import { Bot, BookOpen, Pencil } from "lucide-react";
 import { Card, CardTitle, Button } from "@/components/ui";
@@ -5,36 +8,74 @@ import { CopyButton } from "@/components/CopyButton";
 import { getWikiPage } from "@/mocks/wiki";
 
 /**
- * 할 일의 Claude 작업 지침.
- * 앱에서는 지침만 써 두고, 실제 작업·결과물·따라읽기(왜 이렇게 썼는지)는 Claude Desktop 채팅에 출력된다.
+ * 할 일의 Claude 작업 지침 (편집 가능).
+ * 앱에서는 지침만 써 두고, 실제 작업·결과물·따라읽기는 Claude Desktop 채팅에 출력된다.
  * Claude는 MCP get_task_brief 로 이 지침과 관련 위키를 가져간다.
  */
 export function ClaudeBrief({
   itemId,
   brief,
   guidelines,
+  onSave,
 }: {
   itemId: string;
   brief?: string;
   guidelines: string[];
+  onSave: (brief: string | undefined) => void;
 }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(brief ?? "");
   const startPrompt = `newb 항목 ${itemId} 지침대로 작업해줘. 작성하면서 어디를 왜 이렇게 썼는지 따라읽기로 설명해줘.`;
   const wikis = guidelines.map(getWikiPage).filter((p) => p !== undefined);
+
+  const open = () => {
+    setDraft(brief ?? "");
+    setEditing(true);
+  };
+  const save = () => {
+    onSave(draft.trim() || undefined);
+    setEditing(false);
+  };
 
   return (
     <Card>
       <CardTitle
         icon={<Bot className="size-4" />}
         right={
-          <Button size="sm" variant="ghost">
-            <Pencil className="size-3.5" /> {brief ? "지침 수정" : "지침 쓰기"}
-          </Button>
+          !editing && (
+            <Button size="sm" variant="ghost" onClick={open}>
+              <Pencil className="size-3.5" /> {brief ? "지침 수정" : "지침 쓰기"}
+            </Button>
+          )
         }
       >
         Claude 작업 지침
       </CardTitle>
 
-      {brief ? (
+      {editing ? (
+        <div className="space-y-2 px-5 pb-5">
+          <textarea
+            autoFocus
+            aria-label="Claude 작업 지침"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") setEditing(false);
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) save();
+            }}
+            rows={8}
+            className="w-full resize-y rounded-lg border border-line bg-surface px-4 py-3 text-[14px] leading-relaxed outline-none focus:border-accent"
+          />
+          <div className="flex justify-end gap-2">
+            <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>
+              취소
+            </Button>
+            <Button size="sm" variant="primary" onClick={save}>
+              저장
+            </Button>
+          </div>
+        </div>
+      ) : brief ? (
         <div className="space-y-4 px-5 pb-5">
           <p className="rounded-lg bg-sunken/70 px-4 py-3 text-[14px] leading-relaxed whitespace-pre-line">{brief}</p>
 
@@ -64,9 +105,7 @@ export function ClaudeBrief({
           </div>
         </div>
       ) : (
-        <p className="px-5 pb-5 text-[13px] text-muted">
-          아직 지침이 없어요.
-        </p>
+        <p className="px-5 pb-5 text-[13px] text-muted">아직 지침이 없어요.</p>
       )}
     </Card>
   );

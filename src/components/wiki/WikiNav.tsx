@@ -6,16 +6,21 @@ import { useState } from "react";
 import clsx from "clsx";
 import { ChevronDown, ChevronRight, Home, Menu, Search, X } from "lucide-react";
 import type { NavChapter } from "./structure";
+import { pendingRevisions, useWiki } from "./store";
 
 /** Next.js 문서 스타일 왼쪽 내비게이션 (검색 + 접는 장 + 페이지 트리) */
 function NavTree({ chapters, onNavigate }: { chapters: NavChapter[]; onNavigate?: () => void }) {
   const pathname = usePathname();
   const current = pathname.startsWith("/wiki/") ? decodeURIComponent(pathname.slice(6)) : null;
+  const wiki = useWiki();
+  const pending = new Set(pendingRevisions(wiki).map((r) => r.slug));
+  const titleOf = (slug: string, title: string) => wiki.overrides[slug]?.title ?? title;
   const [query, setQuery] = useState("");
   const [closed, setClosed] = useState<Set<string>>(new Set());
 
   const q = query.trim().toLowerCase();
   const filtered = chapters
+    .map((c) => ({ ...c, pages: c.pages.map((p) => ({ ...p, title: titleOf(p.slug, p.title) })) }))
     .map((c) => ({ ...c, pages: q ? c.pages.filter((p) => p.title.toLowerCase().includes(q)) : c.pages }))
     .filter((c) => c.pages.length > 0);
 
@@ -87,6 +92,9 @@ function NavTree({ chapters, onNavigate }: { chapters: NavChapter[]; onNavigate?
                           )}
                         >
                           <span className="min-w-0 flex-1">{p.title}</span>
+                          {pending.has(p.slug) && (
+                            <span className="size-1.5 shrink-0 rounded-full bg-info" title="확인 대기" />
+                          )}
                           {p.hasIssue && <span className="size-1.5 shrink-0 rounded-full bg-warn" title="점검 필요" />}
                         </Link>
                       </li>

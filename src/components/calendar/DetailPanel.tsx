@@ -1,294 +1,159 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect } from "react";
 import Link from "next/link";
 import clsx from "clsx";
-import { ArrowRight, Check, Clock, Hourglass, MapPin, Plus, RotateCcw, X } from "lucide-react";
-import type { Item, SubItem } from "@/lib/types";
-import { PRIORITY_ORDER, STATUSES, displayKind, progress, statusColor, statusLabel, type Tag } from "@/lib/items";
+import { ArrowRight, Check, Maximize2, RotateCcw, X } from "lucide-react";
+import type { Item } from "@/lib/types";
+import { displayKind, progress, type Tag } from "@/lib/items";
 import { KindTag, PriorityBadge, ProgressRing } from "@/components/ui";
-import { dueLabel, dueTone, fmt } from "@/lib/date";
-import { toneStyle } from "./model";
+import { DeleteButton, EditableText, ItemProperties, SubItemsEditor } from "@/components/item/fields";
 
-/** 항목 상세 패널 — 일정이면 시간·장소·태그, 할 일이면 마감·상태·하위 항목까지 */
+/**
+ * 항목 상세 패널 — 제목·설명·속성·하위 항목을 바로 고친다.
+ * - 데스크톱(≥1024): 노션 사이드 픽처럼 오른쪽 넓은 패널 (뒤 화면은 그대로 보임)
+ * - 태블릿(640~1023): 가운데 모달 + 어두운 배경
+ * - 모바일(<640): 전체 화면 시트
+ */
 export function DetailPanel({
   item,
   tags,
   onUpdate,
+  onDelete,
   onClose,
 }: {
   item: Item;
   tags: Tag[];
   onUpdate: (fn: (i: Item) => Item) => void;
+  onDelete: () => void;
   onClose: () => void;
 }) {
   const kind = displayKind(item);
   const isTask = item.kind === "task";
   const pct = progress(item);
+  const done = isTask && item.status === "done";
 
-  const toggleTag = (id: string) =>
-    onUpdate((i) => ({ ...i, tags: i.tags.includes(id) ? i.tags.filter((t) => t !== id) : [...i.tags, id] }));
-
-  /** 하위 항목이 바뀌면 상태도 맞춘다: 전부 끝나면 완료, 아니면 진행 중 */
-  const setSubItems = (fn: (s: SubItem[]) => SubItem[]) =>
-    onUpdate((i) => {
-      const subItems = fn(i.subItems);
-      let status = i.status;
-      if (subItems.length > 0) {
-        const all = subItems.every((s) => s.done);
-        const any = subItems.some((s) => s.done);
-        if (all) status = "done";
-        else if (status === "done" || (any && status === "todo")) status = "doing";
-      }
-      return { ...i, subItems, status };
-    });
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      const typing = t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT");
+      if (e.key === "Escape" && !typing) onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
 
   return (
-    <aside className="fixed inset-y-0 right-0 z-40 flex w-full max-w-[380px] flex-col border-l border-line bg-surface shadow-pop">
-      <div className="flex items-center justify-between gap-2 border-b border-line px-5 py-3">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <KindTag kind={kind} />
-          {isTask && item.priority && <PriorityBadge p={item.priority} />}
-        </div>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="닫기"
-          className="grid size-8 place-items-center rounded-md text-muted hover:bg-sunken hover:text-ink"
-        >
-          <X className="size-4" />
-        </button>
-      </div>
+    <div className="fixed inset-0 z-40 flex sm:items-center sm:justify-center lg:inset-y-0 lg:right-0 lg:left-auto lg:block lg:w-[min(620px,48vw)]">
+      {/* 태블릿: 어두운 배경 (바깥 클릭으로 닫기) */}
+      <div className="absolute inset-0 hidden bg-black/40 sm:block lg:hidden" onClick={onClose} />
 
-      <div className="flex-1 space-y-6 overflow-y-auto px-5 py-5">
-        <section>
-          <div className="flex items-start gap-3">
-            <h2
-              className={clsx(
-                "min-w-0 flex-1 text-[18px] leading-snug font-semibold",
-                isTask && item.status === "done" && "text-muted line-through",
-              )}
-            >
-              {item.title}
-            </h2>
-            {kind === "task" && pct !== null && <ProgressRing value={pct} size={48} />}
+      <aside
+        role="dialog"
+        aria-label={item.title}
+        className={clsx(
+          "relative flex h-dvh w-full flex-col bg-surface",
+          "pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] sm:pt-0 sm:pb-0",
+          "sm:h-auto sm:max-h-[90dvh] sm:w-[min(720px,92vw)] sm:rounded-2xl sm:border sm:border-line sm:shadow-pop",
+          "lg:h-full lg:max-h-none lg:w-full lg:rounded-none lg:border-0 lg:border-l lg:shadow-pop",
+        )}
+      >
+        <div className="flex items-center justify-between gap-2 border-b border-line px-5 py-3 sm:px-7">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <KindTag kind={kind} />
+            {isTask && item.priority && <PriorityBadge p={item.priority} />}
           </div>
+          <div className="flex items-center gap-1">
+            <Link
+              href={`/items/${item.id}`}
+              aria-label="전체 화면으로 열기"
+              title="전체 화면으로 열기"
+              className="grid size-10 place-items-center rounded-md text-muted hover:bg-sunken hover:text-ink lg:size-8"
+            >
+              <Maximize2 className="size-4" />
+            </Link>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="닫기"
+              className="grid size-10 place-items-center rounded-md text-muted hover:bg-sunken hover:text-ink lg:size-8"
+            >
+              <X className="size-4.5" />
+            </button>
+          </div>
+        </div>
 
-          <dl className="mt-3 space-y-1.5 text-[13.5px]">
-            {item.start && (
-              <div className="flex items-center gap-2 text-muted">
-                <Clock className="size-4 shrink-0" />
-                <span className="tabular">{when(item)}</span>
+        <div className="flex-1 space-y-7 overflow-y-auto px-5 py-6 sm:px-7">
+          <section className="space-y-2">
+            <div className="flex items-start gap-4">
+              <div
+                className={clsx(
+                  "min-w-0 flex-1 text-[21px] leading-snug font-bold tracking-[-0.01em] lg:text-[22px]",
+                  done && "text-muted line-through",
+                )}
+              >
+                <EditableText
+                  label="제목"
+                  value={item.title}
+                  placeholder="제목 없음"
+                  onSave={(v) => v && onUpdate((i) => ({ ...i, title: v }))}
+                />
               </div>
-            )}
-            {item.location && (
-              <div className="flex items-center gap-2 text-muted">
-                <MapPin className="size-4 shrink-0" />
-                {item.location}
-              </div>
-            )}
-          </dl>
+              {kind === "task" && pct !== null && <ProgressRing value={pct} size={52} />}
+            </div>
+          </section>
+
+          <ItemProperties item={item} tags={tags} onUpdate={onUpdate} />
 
           {isTask && (
-            <dl className="mt-3 grid grid-cols-[56px_1fr] items-center gap-y-2 text-[13px]">
-              <dt className="text-muted">진행</dt>
-              <dd className="flex flex-wrap gap-1">
-                {STATUSES.map((s) => (
-                  <button
-                    key={s}
-                    type="button"
-                    onClick={() => onUpdate((i) => ({ ...i, status: s }))}
-                    style={toneStyle(statusColor[s])}
-                    className={clsx(
-                      "inline-flex h-6 items-center gap-1 rounded-full border px-2 text-[12px]",
-                      item.status === s ? "tone-chip border-transparent font-semibold" : "border-line text-muted hover:text-ink",
-                    )}
-                  >
-                    <span className="tone-dot size-1.5 rounded-full" />
-                    {statusLabel[s]}
-                  </button>
-                ))}
-              </dd>
-              <dt className="text-muted">우선순위</dt>
-              <dd className="flex flex-wrap gap-1">
-                {PRIORITY_ORDER.map((p) => (
-                  <button
-                    key={p}
-                    type="button"
-                    onClick={() => onUpdate((i) => ({ ...i, priority: p }))}
-                    className={clsx(
-                      `tone-${p}`,
-                      "h-6 rounded-[5px] px-1.5 text-[11.5px] font-semibold tabular",
-                      item.priority === p ? "tone-chip" : "text-faint hover:text-muted",
-                    )}
-                  >
-                    {p}
-                  </button>
-                ))}
-              </dd>
-              {item.due && (
-                <>
-                  <dt className="text-muted">마감</dt>
-                  <dd className="tabular">
-                    {fmt(item.due, "M월 d일 (EEE)")}
-                    {item.status !== "done" && (
-                      <span
-                        className={clsx(
-                          "ml-1.5 text-[12px] font-medium",
-                          dueTone(item.due) === "danger" ? "text-danger" : dueTone(item.due) === "warn" ? "text-warn" : "text-muted",
-                        )}
-                      >
-                        {dueLabel(item.due)}
-                      </span>
-                    )}
-                  </dd>
-                </>
-              )}
-              {item.from && (
-                <>
-                  <dt className="text-muted">받은 곳</dt>
-                  <dd>{item.from}</dd>
-                </>
-              )}
-            </dl>
-          )}
-
-          {isTask && item.waitingFor && item.status === "waiting" && (
-            <div className="mt-3 flex gap-2 rounded-lg bg-info-soft px-3 py-2 text-[12.5px] text-info">
-              <Hourglass className="mt-0.5 size-3.5 shrink-0" />
-              <span>{item.waitingFor}</span>
-            </div>
-          )}
-        </section>
-
-        <section>
-          <div className="mb-1.5 text-[12px] font-medium text-faint">태그</div>
-          <div className="flex flex-wrap gap-1.5">
-            {tags.map((t) => {
-              const on = item.tags.includes(t.id);
-              return (
+            <section>
+              <div className="mb-2 text-[13px] font-medium text-faint">하위 항목</div>
+              <SubItemsEditor item={item} onUpdate={onUpdate} large />
+              {item.subItems.length === 0 && (
                 <button
-                  key={t.id}
                   type="button"
-                  onClick={() => toggleTag(t.id)}
-                  aria-pressed={on}
-                  style={toneStyle(t.color)}
+                  onClick={() => onUpdate((i) => ({ ...i, status: i.status === "done" ? "todo" : "done" }))}
                   className={clsx(
-                    "inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-[12.5px]",
-                    on ? "tone-chip border-transparent font-semibold" : "border-line text-muted hover:text-ink",
+                    "mt-3 inline-flex h-10 items-center gap-1.5 rounded-lg px-4 text-[14.5px] font-medium",
+                    done ? "border border-line text-muted hover:text-ink" : "bg-accent text-white hover:bg-accent-ink",
                   )}
                 >
-                  <span className="tone-dot size-2 rounded-full" />
-                  {t.label}
+                  {done ? (
+                    <>
+                      <RotateCcw className="size-4" /> 되돌리기
+                    </>
+                  ) : (
+                    <>
+                      <Check className="size-4" /> 완료
+                    </>
+                  )}
                 </button>
-              );
-            })}
-          </div>
-        </section>
+              )}
+            </section>
+          )}
 
-        {isTask && (
-          <section>
-            <div className="mb-1.5 text-[12px] font-medium text-faint">하위 항목</div>
-            <SubItemList item={item} setSubItems={setSubItems} />
-            {item.subItems.length === 0 && (
-              <button
-                type="button"
-                onClick={() => onUpdate((i) => ({ ...i, status: i.status === "done" ? "todo" : "done" }))}
-                className={clsx(
-                  "mt-3 inline-flex h-9 items-center gap-1.5 rounded-lg px-3.5 text-[13.5px] font-medium",
-                  item.status === "done"
-                    ? "border border-line text-muted hover:text-ink"
-                    : "bg-accent text-white hover:bg-accent-ink",
-                )}
-              >
-                {item.status === "done" ? (
-                  <>
-                    <RotateCcw className="size-4" /> 되돌리기
-                  </>
-                ) : (
-                  <>
-                    <Check className="size-4" /> 완료
-                  </>
-                )}
-              </button>
-            )}
+          {/* 노션처럼 속성 아래 본문 */}
+          <section className="border-t border-line pt-5 text-[15px] leading-relaxed">
+            <EditableText
+              label="본문"
+              multiline
+              value={item.description}
+              placeholder="내용 적기"
+              onSave={(v) => onUpdate((i) => ({ ...i, description: v || undefined }))}
+            />
           </section>
-        )}
+        </div>
 
-        <Link
-          href={`/items/${item.id}`}
-          className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line px-3.5 text-[13.5px] font-medium hover:bg-sunken"
-        >
-          상세 보기 <ArrowRight className="size-4" />
-        </Link>
-      </div>
-    </aside>
-  );
-}
-
-function when(i: Item) {
-  const s = i.start!;
-  const e = i.end ?? s;
-  if (s.slice(0, 10) !== e.slice(0, 10)) {
-    return i.allDay
-      ? `${fmt(s, "M월 d일 (EEE)")} – ${fmt(e, "M월 d일 (EEE)")}`
-      : `${fmt(s, "M월 d일 (EEE) HH:mm")} – ${fmt(e, "M월 d일 (EEE) HH:mm")}`;
-  }
-  return i.allDay ? `${fmt(s, "M월 d일 (EEE)")} · 종일` : `${fmt(s, "M월 d일 (EEE)")} · ${s.slice(11, 16)} – ${e.slice(11, 16)}`;
-}
-
-/** 하위 항목 체크리스트 + 추가 (추가하면 단순 작업 → 작업, 다 지우면 다시 단순 작업) */
-function SubItemList({ item, setSubItems }: { item: Item; setSubItems: (fn: (s: SubItem[]) => SubItem[]) => void }) {
-  const [draft, setDraft] = useState("");
-  const add = () => {
-    const title = draft.trim();
-    if (!title) return;
-    setSubItems((s) => [...s, { id: `${item.id}-n${Date.now()}`, title, done: false }]);
-    setDraft("");
-  };
-  return (
-    <div>
-      {item.subItems.length > 0 && (
-        <ul className="space-y-0.5">
-          {item.subItems.map((s) => (
-            <li key={s.id} className="group flex items-center gap-2 rounded-md px-1 py-1 hover:bg-sunken">
-              <button
-                type="button"
-                role="checkbox"
-                aria-checked={s.done}
-                onClick={() => setSubItems((list) => list.map((x) => (x.id === s.id ? { ...x, done: !x.done } : x)))}
-                className={clsx(
-                  "grid size-4.5 shrink-0 place-items-center rounded-[5px] border",
-                  s.done ? "border-ok bg-ok text-white" : "border-line-strong bg-surface",
-                )}
-              >
-                {s.done && <Check className="size-3" strokeWidth={3} />}
-              </button>
-              <span className={clsx("min-w-0 flex-1 text-[13px]", s.done && "text-muted line-through")}>{s.title}</span>
-              <button
-                type="button"
-                aria-label={`${s.title} 삭제`}
-                onClick={() => setSubItems((list) => list.filter((x) => x.id !== s.id))}
-                className="grid size-5 shrink-0 place-items-center rounded text-faint opacity-0 group-hover:opacity-100 hover:text-ink"
-              >
-                <X className="size-3.5" />
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-      <div className="mt-1.5 flex items-center gap-1.5 rounded-md border border-dashed border-line-strong px-2 py-1 focus-within:border-accent">
-        <Plus className="size-3.5 shrink-0 text-faint" />
-        <input
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") add();
-          }}
-          placeholder="하위 항목 추가"
-          className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-faint"
-        />
-      </div>
+        <div className="flex items-center justify-between gap-2 border-t border-line px-5 py-3 sm:px-7">
+          <DeleteButton onDelete={onDelete} />
+          <Link
+            href={`/items/${item.id}`}
+            className="inline-flex h-10 items-center gap-1.5 rounded-lg border border-line px-4 text-[14px] font-medium hover:bg-sunken lg:h-9"
+          >
+            상세 보기 <ArrowRight className="size-4" />
+          </Link>
+        </div>
+      </aside>
     </div>
   );
 }

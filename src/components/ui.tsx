@@ -147,8 +147,10 @@ export function StatusBadge({ status }: { status: ItemStatus }) {
 /** 자유 태그 배지 */
 export function ItemTagChip({ label, color }: { label: string; color: string }) {
   return (
-    <span className="inline-flex h-[20px] items-center gap-1 rounded-[5px] border border-line px-1.5 text-[11.5px] text-muted">
-      <span className="size-1.5 rounded-full" style={{ background: color }} />
+    <span
+      style={{ "--tone": color } as React.CSSProperties}
+      className="tone-chip inline-flex h-[20px] items-center rounded-full px-2 text-[11.5px] font-medium whitespace-nowrap"
+    >
       {label}
     </span>
   );

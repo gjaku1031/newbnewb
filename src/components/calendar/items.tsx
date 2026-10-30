@@ -73,7 +73,7 @@ export function ItemChip({
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: dragId ?? `item:${item.id}` });
   const kind = displayKind(item);
   const meta = KIND_META[kind];
-  const tag = tags.find((t) => item.tags.includes(t.id));
+  const itemTags = item.tags.map((id) => tags.find((t) => t.id === id)).filter((t) => t !== undefined);
   const done = item.kind === "task" && item.status === "done";
   const steps = stepCount(item);
   const range = isMultiDay(item)
@@ -111,11 +111,6 @@ export function ItemChip({
       <span className="flex items-center gap-1 text-[11px] text-muted">
         <span className="shrink-0 tabular">{item.allDay ? "종일" : item.start.slice(11, 16)}</span>
         <span className="tone-text shrink-0 font-medium">{meta.label}</span>
-        {tag && (
-          <span className="truncate" style={{ color: tag.color }}>
-            {tag.label}
-          </span>
-        )}
         <span className="ml-auto flex shrink-0 items-center gap-1">
           {range && <span className="tabular">{range}</span>}
           {steps && <span className="tabular">{steps}</span>}
@@ -136,6 +131,19 @@ export function ItemChip({
         )}
         <span className="truncate">{item.title}</span>
       </span>
+      {itemTags.length > 0 && (
+        <span className="mt-1 flex gap-1 overflow-hidden">
+          {itemTags.map((t) => (
+            <span
+              key={t.id}
+              style={{ "--tone": t.color } as React.CSSProperties}
+              className="tone-chip inline-flex h-[17px] shrink-0 items-center rounded-full px-1.5 text-[10.5px] font-medium leading-none"
+            >
+              {t.label}
+            </span>
+          ))}
+        </span>
+      )}
       {onResizeStart && capRight && (
         <ResizeHandle side="right" visible={selected} onStart={(ev) => onResizeStart("end", ev)} />
       )}
@@ -176,6 +184,7 @@ export function DropZone({
   overClassName = "bg-accent-soft/70",
   style,
   date,
+  onDoubleClick,
   children,
 }: {
   id: string;
@@ -184,11 +193,12 @@ export function DropZone({
   style?: React.CSSProperties;
   /** 날짜 칸이면 YYYY-MM-DD (끝 잡고 늘릴 때 좌표→날짜 찾기용) */
   date?: string;
+  onDoubleClick?: () => void;
   children?: React.ReactNode;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id });
   return (
-    <div ref={setNodeRef} data-date={date} style={style} className={clsx(className, isOver && overClassName)}>
+    <div ref={setNodeRef} data-date={date} style={style} onDoubleClick={onDoubleClick} className={clsx(className, isOver && overClassName)}>
       {children}
     </div>
   );
