@@ -5,8 +5,7 @@
 #      · ken-blog는 앱 계정(kenblog_live)으로 접속해서 영향 없음
 #      · 이미 mysql-admin.env 가 있으면 재설정하지 않고 그 값을 씀
 #   2. oci-prod에서 newb DB + 전용 계정 newb 생성 → oci-prod:/srv/newb/newb.env
-#   3. Object Storage 버킷 newb-files + 버킷 전용 계정 → ~/.config/newb/object-storage.env
-#   4. object-storage.env 를 oci-prod:/srv/newb/ 로 복사
+#   3. Object Storage 버킷 newb-files + 서버 인증(oci-prod만, 이 버킷만) → oci-prod:/srv/newb/object-storage.env (비밀값 없음)
 #
 # 비밀값은 화면·명령줄·git에 남기지 않는다. 여러 번 실행해도 안전.
 #
@@ -17,7 +16,7 @@ cd "$(dirname "$0")"
 
 CONF="$HOME/.config/newb"
 ADMIN_ENV="$CONF/mysql-admin.env"
-DB_SYSTEM_NAME=${DB_SYSTEM_NAME:-ken-blog-mysql}
+DB_SYSTEM_NAME=${DB_SYSTEM_NAME:-ken-prod}
 ADMIN_USER_GIVEN=${ADMIN_USER:-}
 ADMIN_USER=${ADMIN_USER:-admin}
 PROD=${PROD:-oci-prod}
@@ -96,16 +95,11 @@ printf '%s\n%s\n' "$MYSQL_ADMIN_USER" "$MYSQL_ADMIN_PASSWORD" |
   ssh "$PROD" 'bash /tmp/newb-setup-mysql.sh; rc=$?; rm -f /tmp/newb-setup-mysql.sh; exit $rc'
 unset MYSQL_ADMIN_PASSWORD
 
-# ───────── 3. Object Storage ─────────
-OUT="$CONF/object-storage.env" bash setup-object-storage.sh
-
-# ───────── 4. 운영 서버로 복사 ─────────
-scp -q "$CONF/object-storage.env" "${PROD}:/srv/newb/object-storage.env"
-ssh "$PROD" chmod 600 /srv/newb/object-storage.env
-echo "✓ ${PROD}:/srv/newb/object-storage.env 복사"
+# ───────── 3. Object Storage (서버 인증, 비밀키 없음) ─────────
+PROD="$PROD" bash setup-object-storage.sh
 
 echo
 echo "완료. 비밀값 위치:"
 echo "  ${ADMIN_ENV}                (oci-dev, MySQL 관리자 — 평소엔 안 씀)"
-echo "  ${CONF}/object-storage.env  (oci-dev)"
-echo "  ${PROD}:/srv/newb/newb.env, object-storage.env  (앱이 읽음)"
+echo "  ${PROD}:/srv/newb/newb.env          (앱 DB 접속)"
+echo "  ${PROD}:/srv/newb/object-storage.env (버킷 위치, 비밀값 없음)"

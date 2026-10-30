@@ -5,8 +5,8 @@ newb는 **새 서버를 만들지 않고** 이미 있는 무료 자원을 나눠
 | 자원 | 방식 | 무료 한도 |
 |---|---|---|
 | 앱 서버 | `oci-prod` VM에 컨테이너로 추가 (ken-blog와 같은 Caddy 뒤) | VM 무료 한도(4코어·24GB·200GB)는 이미 다 사용 중 → 새 VM 없음 |
-| MySQL | ken-blog가 쓰는 `ken-blog-mysql`(MySQL.Free) **안에** `newb` DB + 전용 사용자 추가 | MySQL.Free는 계정당 1대, 스토리지 50GB를 ken-blog와 공유 |
-| 파일 저장 | Object Storage 버킷 `newb-files` (비공개, S3 호환 API) | Object Storage 전체 20GB · 월 5만 요청 (ken-blog 버킷과 합산) |
+| MySQL | 공용 MySQL `ken-prod`(MySQL.Free, 옛 이름 ken-blog-mysql) **안에** `newb` DB + 전용 사용자 추가 | MySQL.Free는 계정당 1대, 스토리지 50GB를 ken-blog와 공유 |
+| 파일 저장 | Object Storage 버킷 `newb-files` (비공개) + **서버 인증**(비밀키 없음) | Object Storage 전체 20GB · 월 5만 요청 (ken-blog 버킷과 합산) |
 
 ## 한 번에 실행 — `bootstrap.sh` (권장)
 
@@ -19,7 +19,7 @@ bash infra/oci/bootstrap.sh
 
 ## 1. Object Storage — `setup-object-storage.sh`
 
-OCI CLI가 설정된 곳(oci-dev)에서 실행합니다.
+OCI CLI와 oci-prod SSH가 설정된 곳(oci-dev)에서 실행합니다. **비밀키를 만들지 않습니다.**
 
 ```bash
 bash infra/oci/setup-object-storage.sh
@@ -27,15 +27,12 @@ bash infra/oci/setup-object-storage.sh
 
 만드는 것
 - 버킷 `newb-files` (비공개)
-- 앱 전용 사용자 `newb-app` + 그룹 `newb-app-objects`
-- 정책 `newb-app-objects`: **newb-files 버킷의 객체만** 읽기·쓰기 (ken-blog 버킷 접근 불가)
-- `newb-app`의 S3 호환 키 → `~/.config/newb/object-storage.env` (권한 600, 화면 출력 없음)
+- 동적 그룹 `newb-prod`: oci-prod 인스턴스 하나만
+- 정책 `newb-prod-objects`: 그 서버는 **newb-files 버킷의 객체만** 읽기·쓰기 (ken-blog 버킷은 접근 거부 — 확인함)
+- `oci-prod:/srv/newb/object-storage.env`: `OCI_AUTH=instance_principal` `OCI_REGION` `OCI_NAMESPACE` `OCI_BUCKET` (비밀값 없음)
 
-운영 서버로 복사
-
-```bash
-scp ~/.config/newb/object-storage.env oci-prod:/srv/newb/object-storage.env
-```
+앱은 OCI SDK의 Instance Principal 인증으로 버킷을 씁니다. 키가 없어서 유출될 것도 없습니다.
+(이 계정은 Identity Domain이라 IAM 사용자를 만들려면 이메일이 필수 → 사용자·키 방식 대신 서버 인증을 택함)
 
 ## 2. MySQL — `setup-mysql.sh`
 
@@ -59,6 +56,6 @@ ssh -t oci-prod bash /tmp/setup-mysql.sh
 |---|---|
 | `oci-dev:~/.config/newb/mysql-admin.env` | MySQL 관리자 아이디·비밀번호 (평소엔 쓰지 않음) |
 | `oci-prod:/srv/newb/newb.env` | `DB_HOST` `DB_PORT` `DB_NAME` `DB_USER` `DB_PASSWORD` `DATABASE_URL` |
-| `oci-prod:/srv/newb/object-storage.env` | `S3_ENDPOINT` `S3_REGION` `S3_BUCKET` `S3_ACCESS_KEY_ID` `S3_SECRET_ACCESS_KEY` `S3_FORCE_PATH_STYLE` |
+| `oci-prod:/srv/newb/object-storage.env` | `OCI_AUTH` `OCI_REGION` `OCI_NAMESPACE` `OCI_BUCKET` (비밀값 없음) |
 
-둘 다 git에 올리지 않습니다 (`.gitignore`에 `*.env`). 앱 컨테이너는 `env_file`로 두 파일을 읽습니다.
+비밀값 파일은 git에 올리지 않습니다 (`.gitignore`에 `*.env`). 앱 컨테이너는 `env_file`로 두 파일을 읽습니다.
