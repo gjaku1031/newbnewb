@@ -8,6 +8,15 @@ newb는 **새 서버를 만들지 않고** 이미 있는 무료 자원을 나눠
 | MySQL | ken-blog가 쓰는 `ken-blog-mysql`(MySQL.Free) **안에** `newb` DB + 전용 사용자 추가 | MySQL.Free는 계정당 1대, 스토리지 50GB를 ken-blog와 공유 |
 | 파일 저장 | Object Storage 버킷 `newb-files` (비공개, S3 호환 API) | Object Storage 전체 20GB · 월 5만 요청 (ken-blog 버킷과 합산) |
 
+## 한 번에 실행 — `bootstrap.sh` (권장)
+
+oci-dev의 레포에서 실행합니다. 아래 1·2번을 차례로 실행하고, MySQL 관리자 비밀번호가 없으면 **OCI CLI로 재설정**합니다
+(ken-blog는 앱 계정 `kenblog_live`로 접속해서 영향 없음). 관리자 계정 이름이 `admin`이 아니면 `ADMIN_USER=이름`을 붙이세요.
+
+```bash
+bash infra/oci/bootstrap.sh
+```
+
 ## 1. Object Storage — `setup-object-storage.sh`
 
 OCI CLI가 설정된 곳(oci-dev)에서 실행합니다.
@@ -48,6 +57,7 @@ ssh -t oci-prod bash /tmp/setup-mysql.sh
 
 | 파일 | 내용 |
 |---|---|
+| `oci-dev:~/.config/newb/mysql-admin.env` | MySQL 관리자 아이디·비밀번호 (평소엔 쓰지 않음) |
 | `oci-prod:/srv/newb/newb.env` | `DB_HOST` `DB_PORT` `DB_NAME` `DB_USER` `DB_PASSWORD` `DATABASE_URL` |
 | `oci-prod:/srv/newb/object-storage.env` | `S3_ENDPOINT` `S3_REGION` `S3_BUCKET` `S3_ACCESS_KEY_ID` `S3_SECRET_ACCESS_KEY` `S3_FORCE_PATH_STYLE` |
 
