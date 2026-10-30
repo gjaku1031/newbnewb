@@ -8,6 +8,7 @@ import type { Memo, MemoAction, MemoActionKind } from "@/lib/memoTypes";
 import { fmt } from "@/lib/date";
 import { useWiki } from "@/components/wiki/store";
 import { addMemo, deleteMemo, useMemos } from "./store";
+import { ItemLink } from "@/components/item/ItemPeek";
 
 const ACTION_ICON: Record<MemoActionKind, typeof CalendarPlus> = {
   create_event: CalendarPlus,
@@ -89,9 +90,16 @@ function ActionRow({ a }: { a: MemoAction }) {
       </span>
     </>
   );
+  // 항목으로 가는 링크는 사이드 패널로 연다 (저장된 예전 주소 /items/… 도 그대로 처리)
+  const itemId = a.href?.match(/^\/items\/([^/?#]+)$/)?.[1];
+  const rowCls = "flex gap-2 rounded-md px-2 py-1.5 text-[13.5px] hover:bg-sunken";
   return (
     <li>
-      {a.href ? (
+      {itemId ? (
+        <ItemLink id={decodeURIComponent(itemId)} className={rowCls}>
+          {inner}
+        </ItemLink>
+      ) : a.href ? (
         <Link href={a.href} className="flex gap-2 rounded-md px-2 py-1.5 text-[13.5px] hover:bg-sunken">
           {inner}
         </Link>

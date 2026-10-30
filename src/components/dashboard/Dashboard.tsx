@@ -28,6 +28,7 @@ import { questions } from "@/mocks/questions";
 import { getWikiPage } from "@/mocks/wiki";
 import { morningBriefing, eveningBriefing } from "@/mocks/briefing";
 import type { Item } from "@/lib/types";
+import { ItemLink } from "@/components/item/ItemPeek";
 
 /** 오늘 할 일: 오늘 배치됐거나 마감이 오늘까지인 미완료 할 일 (기다리는 중 제외) */
 function todayTasks(items: Item[]): Item[] {
@@ -63,13 +64,14 @@ function toFind(items: Item[]) {
             label: m.kind === "ask_person" ? `${m.target}께 묻기` : `${m.target ?? "문서"}에서 찾기`,
             text: m.what,
             waiting: false,
+            itemId: undefined as string | undefined,
           }))
       : [],
   );
   const covered = new Set(questions.filter((q) => q.status === "open" && q.itemId).map((q) => q.itemId));
   const fromWaiting = items
     .filter((i) => i.status === "waiting" && i.waitingFor && !covered.has(i.id))
-    .map((i) => ({ key: i.id, href: `/items/${i.id}`, label: "기다리는 중", text: `${i.title} — ${i.waitingFor}`, waiting: true }));
+    .map((i) => ({ key: i.id, href: "", itemId: i.id, label: "기다리는 중", text: `${i.title} — ${i.waitingFor}`, waiting: true }));
   return [...fromQuestions, ...fromWaiting];
 }
 
@@ -113,8 +115,7 @@ export function Dashboard() {
                   const tone = it.due ? dueTone(it.due) : "muted";
                   return (
                     <li key={it.id}>
-                      <Link
-                        href={`/items/${it.id}`}
+                      <ItemLink id={it.id}
                         className="group flex items-center gap-4 px-5 py-4 transition-colors hover:bg-sunken/60"
                       >
                         <span className="w-5 shrink-0 text-center text-[13px] font-semibold text-faint tabular">
@@ -172,7 +173,7 @@ export function Dashboard() {
                             <Check className="size-5" strokeWidth={2.4} />
                           </span>
                         )}
-                      </Link>
+                      </ItemLink>
                     </li>
                   );
                 })}
@@ -199,8 +200,7 @@ export function Dashboard() {
                   const isPast = end <= nowHHMM;
                   return (
                     <li key={e.id}>
-                      <Link
-                        href={`/items/${e.id}`}
+                      <ItemLink id={e.id}
                         style={{ "--tone": "var(--kind-event)" } as React.CSSProperties}
                         className={clsx(
                           "tone-bar flex items-center gap-4 rounded-r-lg px-3.5 py-2.5 hover:brightness-[0.98]",
@@ -217,7 +217,7 @@ export function Dashboard() {
                             지금
                           </span>
                         )}
-                      </Link>
+                      </ItemLink>
                     </li>
                   );
                 })}
@@ -241,9 +241,9 @@ export function Dashboard() {
                         return (
                           <li key={id} className="flex items-center gap-2 text-[14px]">
                             <CircleCheck className="size-4 shrink-0 text-ok" />
-                            <Link href={`/items/${id}`} className="truncate hover:text-accent-ink">
+                            <ItemLink id={id} className="truncate hover:text-accent-ink">
                               {it.title}
-                            </Link>
+                            </ItemLink>
                           </li>
                         );
                       })}
@@ -257,9 +257,9 @@ export function Dashboard() {
                         if (!it) return null;
                         return (
                           <li key={p.itemId}>
-                            <Link href={`/items/${p.itemId}`} className="block truncate text-[14px] hover:text-accent-ink">
+                            <ItemLink id={p.itemId} className="block truncate text-[14px] hover:text-accent-ink">
                               {it.title}
-                            </Link>
+                            </ItemLink>
                             <div className="mt-1.5 flex items-center gap-3">
                               <div className="relative h-1.5 flex-1 overflow-hidden rounded-full bg-sunken">
                                 <div className="absolute inset-y-0 left-0 rounded-full bg-accent" style={{ width: `${p.to}%` }} />
@@ -358,17 +358,31 @@ export function Dashboard() {
                 알아올 것
               </CardTitle>
               <ul className="space-y-2 px-5 pb-5">
-                {findList.map((f) => (
-                  <li key={f.key}>
-                    <Link href={f.href} className="block rounded-lg bg-info-soft/60 px-3.5 py-3 hover:bg-info-soft">
+                {findList.map((f) => {
+                  const cls = "block rounded-lg bg-info-soft/60 px-3.5 py-3 hover:bg-info-soft";
+                  const body = (
+                    <>
                       <div className="flex items-center gap-1.5 text-[12px] font-semibold text-info">
                         {f.waiting && <Hourglass className="size-3.5" />}
                         {f.label}
                       </div>
                       <div className="mt-0.5 text-[13.5px] leading-snug">{f.text}</div>
-                    </Link>
-                  </li>
-                ))}
+                    </>
+                  );
+                  return (
+                    <li key={f.key}>
+                      {f.itemId ? (
+                        <ItemLink id={f.itemId} className={cls}>
+                          {body}
+                        </ItemLink>
+                      ) : (
+                        <Link href={f.href} className={cls}>
+                          {body}
+                        </Link>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             </Card>
 

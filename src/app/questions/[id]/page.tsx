@@ -10,6 +10,7 @@ import type { QuestionRecord } from "@/lib/types";
 import { questions, signalLabel } from "@/mocks/questions";
 import { getItem } from "@/mocks/items";
 import { getWikiPage } from "@/mocks/wiki";
+import { ItemLink } from "@/components/item/ItemPeek";
 
 export function generateStaticParams() {
   return questions.map((q) => ({ id: q.id }));
@@ -72,13 +73,12 @@ export default async function QuestionDetailPage(props: PageProps<"/questions/[i
                   </span>
                 </h2>
                 {quest ? (
-                  <Link
-                    href={`/items/${quest.id}`}
+                  <ItemLink id={quest.id}
                     className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-line bg-surface px-2.5 text-[13px] font-medium hover:bg-sunken"
                   >
                     <Target className="size-3.5" />
                     연결된 항목 보기
-                  </Link>
+                  </ItemLink>
                 ) : (
                   <Button size="sm">
                     <ListPlus className="size-3.5" />
@@ -151,12 +151,12 @@ export default async function QuestionDetailPage(props: PageProps<"/questions/[i
           {quest && (
             <Card>
               <CardTitle icon={<Target className="size-4" />}>연결된 항목</CardTitle>
-              <Link href={`/items/${quest.id}`} className="mx-2 mb-3 block rounded-lg px-3 py-2 hover:bg-sunken">
+              <ItemLink id={quest.id} className="mx-2 mb-3 block rounded-lg px-3 py-2 hover:bg-sunken">
                 <div className="text-[14px] font-medium">{quest.title}</div>
                 <div className="mt-0.5 text-[12.5px] text-muted">
                   {[quest.priority, quest.due && `마감 ${fmt(quest.due, "M월 d일")}`].filter(Boolean).join(" · ")}
                 </div>
-              </Link>
+              </ItemLink>
             </Card>
           )}
         </aside>

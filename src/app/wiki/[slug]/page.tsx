@@ -8,6 +8,7 @@ import { KIND_META, displayKind } from "@/lib/items";
 import { questions } from "@/mocks/questions";
 import { items } from "@/mocks/items";
 import { getWikiPage, wikiPages } from "@/mocks/wiki";
+import { ItemLink } from "@/components/item/ItemPeek";
 
 export function generateStaticParams() {
   return wikiPages.map((p) => ({ slug: p.slug }));
@@ -47,10 +48,10 @@ export default async function WikiDetailPage(props: PageProps<"/wiki/[slug]">) {
               <ul className="mt-3 space-y-1.5">
                 {usedInItems.map((it) => (
                   <li key={it.id}>
-                    <Link href={`/items/${it.id}`} className="flex items-center gap-2 text-[13.5px] hover:text-accent-ink">
+                    <ItemLink id={it.id} className="flex items-center gap-2 text-[13.5px] hover:text-accent-ink">
                       <ArrowUpRight className="size-3.5 shrink-0 text-faint" />
                       <span className="text-faint">{KIND_META[displayKind(it)].label}</span> {it.title}
-                    </Link>
+                    </ItemLink>
                   </li>
                 ))}
                 {citedIn.map((q) => (

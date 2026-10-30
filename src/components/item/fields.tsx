@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
 import { Check, Plus, Trash2, X } from "lucide-react";
@@ -426,7 +427,9 @@ export function ItemProperties({
                 key={slug}
                 className="inline-flex h-9 items-center gap-1 rounded-md border border-line pr-0.5 pl-2.5 text-[13.5px] lg:h-7 lg:text-[12.5px]"
               >
-                {p.title}
+                <Link href={`/wiki/${slug}`} className="hover:text-accent-ink hover:underline">
+                  {p.title}
+                </Link>
                 <button
                   type="button"
                   aria-label={`${p.title} 연결 해제`}
