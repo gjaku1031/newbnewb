@@ -48,7 +48,7 @@ export default async function WikiDetailPage(props: PageProps<"/wiki/[slug]">) {
                 {usedInItems.map((it) => (
                   <li key={it.id}>
                     <Link href={`/items/${it.id}`} className="flex items-center gap-2 text-[13.5px] hover:text-accent-ink">
-                      <ArrowUpRight className="size-3.5 text-faint" />
+                      <ArrowUpRight className="size-3.5 shrink-0 text-faint" />
                       <span className="text-faint">{KIND_META[displayKind(it)].label}</span> {it.title}
                     </Link>
                   </li>
@@ -56,9 +56,9 @@ export default async function WikiDetailPage(props: PageProps<"/wiki/[slug]">) {
                 {citedIn.map((q) => (
                   <li key={q.id}>
                     <Link href={`/questions/${q.id}`} className="flex items-center gap-2 text-[13.5px] hover:text-accent-ink">
-                      <MessageCircleQuestion className="size-3.5 text-faint" />
-                      <span className="text-faint">질문</span>
-                      <span className="truncate">{q.question}</span>
+                      <MessageCircleQuestion className="size-3.5 shrink-0 text-faint" />
+                      <span className="shrink-0 text-faint">질문</span>
+                      <span className="min-w-0 truncate">{q.question}</span>
                       <VerdictBadge v={q.verdict} className="shrink-0" />
                     </Link>
                   </li>
