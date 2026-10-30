@@ -1,0 +1,26 @@
+diff --git a/node_modules/agentation/dist/index.js b/node_modules/agentation/dist/index.js
+index 7082d5c..c723a54 100644
+--- a/node_modules/agentation/dist/index.js
++++ b/node_modules/agentation/dist/index.js
+@@ -7706,6 +7706,8 @@ var DEFAULT_SKIP_EXACT = /* @__PURE__ */ new Set([
+ ]);
+ var DEFAULT_SKIP_PATTERNS = [
+   /Boundary$/,
++  /^__next_/,
++  // Next.js 16 내부 경계 (__next_root_layout_boundary__ 등)
+   // ErrorBoundary, RedirectBoundary
+   /BoundaryHandler$/,
+   // ErrorBoundaryHandler
+diff --git a/node_modules/agentation/dist/index.mjs b/node_modules/agentation/dist/index.mjs
+index f716ae8..71dadca 100644
+--- a/node_modules/agentation/dist/index.mjs
++++ b/node_modules/agentation/dist/index.mjs
+@@ -7633,6 +7633,8 @@ var DEFAULT_SKIP_EXACT = /* @__PURE__ */ new Set([
+ ]);
+ var DEFAULT_SKIP_PATTERNS = [
+   /Boundary$/,
++  /^__next_/,
++  // Next.js 16 내부 경계 (__next_root_layout_boundary__ 등)
+   // ErrorBoundary, RedirectBoundary
+   /BoundaryHandler$/,
+   // ErrorBoundaryHandler
