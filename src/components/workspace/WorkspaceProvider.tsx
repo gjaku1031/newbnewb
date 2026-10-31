@@ -14,8 +14,9 @@ export function WorkspaceProvider({ initial, children }: { initial: WorkspaceSna
   seed(initial);
 
   useEffect(() => {
+    // 숨겨진 탭에서는 폴링하지 않는다 (돌아오면 포커스 때 다시 불러옴)
     const timer = window.setInterval(() => {
-      if (hasServerWork(getWorkspace())) void refresh();
+      if (document.visibilityState === "visible" && hasServerWork(getWorkspace())) void refresh();
     }, POLL_MS);
     // 다른 기기·Claude Desktop에서 바뀐 내용은 창으로 돌아올 때 가져온다
     let last = Date.now();

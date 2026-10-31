@@ -4,7 +4,7 @@ import type { Caution, Item } from "@/lib/types";
 import type { WorkspaceSnapshot } from "@/lib/workspace";
 import { addDays, format, parseISO } from "date-fns";
 import { TODAY } from "@/lib/today";
-import { getWorkspace, mutate, newClientId, useWorkspace } from "@/components/workspace/store";
+import { applyLocal, getWorkspace, mutate, newClientId, useWorkspace } from "@/components/workspace/store";
 import * as actions from "@/server/actions";
 
 /**
@@ -56,10 +56,18 @@ export function deleteCaution(id: string) {
   );
 }
 
-/** 다시 봤음 → 다음에 보여줄 날을 뒤로 (날짜는 서버가 정한 값으로 맞춘다) */
+const reviewing = new Set<string>();
+
+/** 다시 봤음 → 다음에 보여줄 날을 뒤로 (날짜는 서버가 정한 값으로 맞춘다). 연달아 눌러도 한 번만 */
 export async function reviewCaution(id: string) {
-  const review = await mutate(null, () => actions.reviewCaution(id));
-  if (review) await mutate(patch(id, (c) => ({ ...c, review })), async () => undefined);
+  if (reviewing.has(id)) return;
+  reviewing.add(id);
+  try {
+    const review = await mutate(null, () => actions.reviewCaution(id));
+    if (review) applyLocal(patch(id, (c) => ({ ...c, review })));
+  } finally {
+    reviewing.delete(id);
+  }
 }
 
 /** 이 항목을 할 때 알려줄 주의할 점: 같은 위키를 쓰거나 같은 태그가 붙은 것 */

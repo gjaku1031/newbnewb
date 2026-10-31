@@ -8,12 +8,6 @@ export const sourceTypeLabel: Record<Source["type"], string> = {
   note: "메모",
 };
 
-export const verdictLabel: Record<QuestionRecord["verdict"], string> = {
-  ANSWER: "확답",
-  ANSWER_WITH_CAVEAT: "조건부 답",
-  NEED_INFO: "알아올 것 있음",
-};
-
 export const signalLabel: Record<keyof QuestionRecord["signals"], string> = {
   coverage: "근거 커버리지",
   conflict: "근거 충돌",

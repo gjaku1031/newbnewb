@@ -15,6 +15,7 @@
 
 # next.js
 /.next/
+/.next-e2e/
 /out/
 
 # production
@@ -46,3 +47,7 @@ next-env.d.ts
 
 # 비밀값 파일
 *.env
+
+# e2e
+/test-results/
+/playwright-report/

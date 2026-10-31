@@ -28,9 +28,6 @@ export const DEFAULT_TAGS: Tag[] = [
   { id: "personal", label: "개인", color: "#85847e" },
 ];
 
-export const isTodo = (i: Item) => i.kind === "task";
-export const isDone = (i: Item) => i.kind === "task" && i.status === "done";
-
 /** 달성률 % (일정은 null) */
 export function progress(i: Item): number | null {
   if (i.kind === "event") return null;

@@ -13,3 +13,9 @@ export async function requireUser(request?: Request) {
   if (!user) throw new UnauthorizedError();
   return user;
 }
+
+/** Route Handler용: 로그인 안 했으면 401, 했으면 handler 실행 */
+export async function withUser(request: Request, handler: () => Promise<Response>): Promise<Response> {
+  if (!(await getCurrentUser(request))) return Response.json({ error: new UnauthorizedError().message }, { status: 401 });
+  return handler();
+}

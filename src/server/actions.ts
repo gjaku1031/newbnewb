@@ -8,7 +8,7 @@ import { after } from "next/server";
 import { z } from "zod";
 import type { Item } from "@/lib/types";
 import type { Tag } from "@/lib/items";
-import type { PageContent, WikiComment } from "@/lib/wikiTypes";
+import type { WikiComment } from "@/lib/wikiTypes";
 import type { WikiReview } from "@/lib/types";
 import { getDb } from "@/server/db/client";
 import { requireUser } from "@/server/auth";
@@ -55,22 +55,15 @@ export async function removeTag(id: string) {
 
 /* ───────── 위키 ───────── */
 
-export async function submitRevision(input: { id: string; slug: string; after: PageContent; message: string }) {
-  await requireUser();
-  const db = getDb();
-  const r = await wiki.submitRevision(db, { ...v.RevisionInput.parse(input), author: "me" });
-  later("위키 검토", () => wiki.runReview(db, r.id));
-  return r;
-}
-
+/** 반영했으면 true. 그 사이 문서가 바뀌었으면 false (변경은 확인 대기로 돌아간다) */
 export async function applyRevision(id: string) {
   await requireUser();
-  await wiki.applyRevision(getDb(), z.string().max(128).parse(id));
+  return wiki.applyRevision(getDb(), v.RevisionId.parse(id));
 }
 
 export async function cancelRevision(id: string) {
   await requireUser();
-  await wiki.cancelRevision(getDb(), z.string().max(128).parse(id));
+  await wiki.cancelRevision(getDb(), v.RevisionId.parse(id));
 }
 
 export async function addComment(input: { id: string; slug: string; anchor: WikiComment["anchor"]; text: string }) {
@@ -115,6 +108,14 @@ export async function addMemo(input: { id: string; text: string }) {
   const memo = v.MemoInput.parse(input);
   await memosService.addMemo(db, memo);
   later("메모 처리", () => memosService.processMemo(db, memo.id));
+}
+
+/** 처리에 실패한 메모를 다시 정리 */
+export async function retryMemo(id: string) {
+  await requireUser();
+  const db = getDb();
+  const memoId = v.Id.parse(id);
+  if (await memosService.retryMemo(db, memoId)) later("메모 처리", () => memosService.processMemo(db, memoId));
 }
 
 export async function deleteMemo(id: string) {

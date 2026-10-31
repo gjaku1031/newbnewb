@@ -16,8 +16,12 @@ import { syncClock } from "@/lib/today";
 export const SnapshotContext = createContext<WorkspaceSnapshot | null>(null);
 
 let state: WorkspaceSnapshot | null = null;
+/** 서버에 저장 중인 변경 수 */
 let pending = 0;
+/** 화면에서 바꾼 횟수 — 다시 불러오는 사이에 바뀌었는지 알아보는 데 쓴다 */
+let changeSeq = 0;
 let refreshQueued = false;
+let inFlight: Promise<boolean> | null = null;
 let saveError: string | null = null;
 const listeners = new Set<() => void>();
 
@@ -60,6 +64,7 @@ export function useWorkspace<T>(select: (s: WorkspaceSnapshot) => T): T {
  * apply는 화면에 바로 반영할 변경, remote는 서버 액션 호출.
  */
 export async function mutate<R>(apply: ((s: WorkspaceSnapshot) => WorkspaceSnapshot) | null, remote: () => Promise<R>) {
+  changeSeq++;
   if (apply && state) {
     state = apply(state);
     emit();
@@ -70,7 +75,7 @@ export async function mutate<R>(apply: ((s: WorkspaceSnapshot) => WorkspaceSnaps
     return result;
   } catch (error) {
     console.error("[workspace] 저장 실패", error);
-    setSaveError("저장하지 못했어요. 서버 값으로 되돌렸어요.");
+    setSaveError("저장하지 못했어요. 서버에 저장된 값으로 되돌렸어요.");
     refreshQueued = true;
     return undefined;
   } finally {
@@ -79,29 +84,51 @@ export async function mutate<R>(apply: ((s: WorkspaceSnapshot) => WorkspaceSnaps
   }
 }
 
-/** 서버 스냅샷으로 다시 불러오기 (저장 중인 변경이 있으면 끝난 뒤로 미룬다) */
-export async function refresh() {
+/** 서버가 이미 저장한 값을 화면에만 반영 (서버 응답으로 받은 값 맞추기) */
+export function applyLocal(apply: (s: WorkspaceSnapshot) => WorkspaceSnapshot) {
+  if (!state) return;
+  state = apply(state);
+  emit();
+}
+
+/**
+ * 서버 스냅샷으로 다시 불러오기. 받아서 화면에 반영했으면 true.
+ * - 저장 중인 변경이 있으면 끝난 뒤로 미룬다
+ * - 이미 받는 중이면 그 요청을 같이 기다린다 (폴링·포커스가 겹쳐도 요청이 쌓이지 않게)
+ */
+export function refresh(): Promise<boolean> {
   if (pending > 0) {
     refreshQueued = true;
-    return;
+    return Promise.resolve(false);
   }
+  inFlight ??= load().finally(() => {
+    inFlight = null;
+    if (refreshQueued && pending === 0) void refresh();
+  });
+  return inFlight;
+}
+
+async function load(): Promise<boolean> {
   refreshQueued = false;
+  const seqAtStart = changeSeq;
   try {
     const res = await fetch("/api/workspace", { cache: "no-store" });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const snap: WorkspaceSnapshot = await res.json();
-    // 받는 사이에 새 변경이 생겼으면 그 저장이 끝난 뒤 다시 받는다
-    if (pending > 0) {
+    // 받는 사이에 화면에서 바꾼 게 있으면(저장이 이미 끝났더라도) 이 스냅샷은 그 변경을 모를 수 있다 → 다시 받는다
+    if (changeSeq !== seqAtStart || pending > 0) {
       refreshQueued = true;
-      return;
+      return false;
     }
-    if (!state || snap.version >= state.version) {
-      state = snap;
-      syncClock(snap.now);
-      emit();
-    }
+    if (state && snap.version < state.version) return false;
+    state = snap;
+    syncClock(snap.now);
+    emit();
+    return true;
   } catch (error) {
     console.error("[workspace] 다시 불러오기 실패", error);
+    if (saveError) setSaveError("저장하지 못했고 서버 값도 불러오지 못했어요. 연결을 확인한 뒤 새로고침해 주세요.");
+    return false;
   }
 }
 

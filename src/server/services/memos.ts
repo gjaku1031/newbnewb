@@ -5,9 +5,10 @@ import type { Memo, MemoAction } from "@/lib/memoTypes";
 import { fmt } from "@/lib/date";
 import { memoProcessor, type MemoPlan, type MemoProcessor } from "@/lib/memoProcessor";
 import { seoulNow, seoulToday } from "@/lib/today";
-import { memos, tags, wikiPages } from "@/server/db/schema";
+import { memos, wikiPages } from "@/server/db/schema";
 import { dtIn, dtOut, opt } from "@/server/db/convert";
 import type { Db, Exec } from "@/server/db/types";
+import { affectedRows, stalledBefore } from "./jobs";
 import { newId } from "@/server/ids";
 import { writeItem } from "./items";
 import { pageContent, runReview, submitRevisionTx } from "./wiki";
@@ -37,17 +38,31 @@ export async function processMemo(db: Db, id: string, processor: MemoProcessor =
   const [memo] = await db.select().from(memos).where(eq(memos.id, id));
   if (!memo || memo.status !== "processing") return;
   const today = seoulToday();
-  const plan = await processor.process(memo.text, today);
 
-  const revisionIds = await db.transaction(async (tx) => {
-    const { actions, revisionIds } = await applyPlan(tx, plan, today, id);
-    await tx
-      .update(memos)
-      .set({ status: "done", result: { cleaned: plan.cleaned, actions } })
-      .where(and(eq(memos.id, id), eq(memos.status, "processing")));
-    return revisionIds;
-  });
+  let revisionIds: string[];
+  try {
+    const plan = await processor.process(memo.text, today);
+    revisionIds = await db.transaction(async (tx) => {
+      // 메모 행을 잠그고 다시 확인 — 같은 메모를 다른 요청이 먼저 처리했으면 아무것도 만들지 않는다
+      const [cur] = await tx.select({ status: memos.status }).from(memos).where(eq(memos.id, id)).for("update");
+      if (cur?.status !== "processing") return [];
+      const { actions, revisionIds } = await applyPlan(tx, plan, today, id);
+      await tx.update(memos).set({ status: "done", result: { cleaned: plan.cleaned, actions } }).where(eq(memos.id, id));
+      return revisionIds;
+    });
+  } catch (error) {
+    // 같은 이유로 계속 실패하며 무한히 다시 돌지 않게 '실패'로 남긴다 (화면에서 다시 정리 가능)
+    console.error("[memo] 처리 실패", id, error);
+    await db.update(memos).set({ status: "failed" }).where(and(eq(memos.id, id), eq(memos.status, "processing")));
+    return;
+  }
   for (const rid of revisionIds) await runReview(db, rid);
+}
+
+/** 실패한 메모를 다시 처리 대기로 (처리는 processMemo로 따로). 바뀌었으면 true */
+export async function retryMemo(db: Exec, id: string) {
+  const res = await db.update(memos).set({ status: "processing" }).where(and(eq(memos.id, id), eq(memos.status, "failed")));
+  return affectedRows(res) === 1;
 }
 
 async function applyPlan(tx: Exec, plan: MemoPlan, today: string, memoId: string) {
@@ -67,7 +82,6 @@ async function applyPlan(tx: Exec, plan: MemoPlan, today: string, memoId: string
     actions.push({ kind: "add_caution", label: `주의할 점 추가 · ${c.point}`, href: `/wiki/cautions#${caution.id}` });
   }
 
-  const tagIds = new Set((await tx.select({ id: tags.id }).from(tags)).map((t) => t.id));
   const base = { subItems: [], wikiRefs: [], createdAt: today } satisfies Partial<Item>;
 
   for (const e of plan.events) {
@@ -84,7 +98,7 @@ async function applyPlan(tx: Exec, plan: MemoPlan, today: string, memoId: string
       start,
       end,
       allDay: !e.time || undefined,
-      tags: tagIds.has("meeting") ? ["meeting"] : [],
+      tags: ["meeting"], // 태그가 지워졌으면 writeItem이 건너뜀
       location: e.location,
       from: e.from,
     };
@@ -154,11 +168,16 @@ async function applyPlan(tx: Exec, plan: MemoPlan, today: string, memoId: string
 
 /** 끊긴 메모 처리 다시 돌리기 */
 export async function resumeStalledMemos(db: Db, olderThanMs = 30_000) {
-  const cutoff = sql`NOW(3) - INTERVAL ${olderThanMs * 1000} MICROSECOND`;
-  const stalled = await db
-    .select({ id: memos.id })
-    .from(memos)
-    .where(and(eq(memos.status, "processing"), lt(memos.updatedAt, cutoff)));
-  for (const { id } of stalled) await processMemo(db, id);
-  return stalled.length;
+  const isStalled = (id?: string) =>
+    and(id ? eq(memos.id, id) : undefined, eq(memos.status, "processing"), lt(memos.updatedAt, stalledBefore(olderThanMs)));
+  const stalled = await db.select({ id: memos.id }).from(memos).where(isStalled());
+  let resumed = 0;
+  for (const { id } of stalled) {
+    // 먼저 점유 — 동시에 들어온 다른 요청은 같은 메모를 또 돌리지 않는다
+    const claim = await db.update(memos).set({ updatedAt: sql`CURRENT_TIMESTAMP(3)` }).where(isStalled(id));
+    if (affectedRows(claim) !== 1) continue;
+    await processMemo(db, id);
+    resumed++;
+  }
+  return resumed;
 }

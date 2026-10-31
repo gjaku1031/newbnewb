@@ -3,6 +3,8 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   // Docker 이미지용 최소 실행 파일 (.next/standalone)
   output: "standalone",
+  // e2e 테스트용 개발 서버는 별도 폴더에 빌드해서 평소 개발 서버(.next)와 같이 띄울 수 있게 한다
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   // 오른쪽 아래는 Agentation 주석 툴바 자리라 Next 개발 배지는 끔 (에러 오버레이는 그대로 뜸)
   devIndicators: false,
   // 다른 기기(Tailscale 등)에서 개발 서버에 접속할 때 허용할 주소 — 쉼표로 구분 (예: DEV_ORIGINS=100.x.x.x,my-host)

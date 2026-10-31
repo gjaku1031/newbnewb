@@ -34,8 +34,9 @@ export async function listQuestions(db: Exec): Promise<QuestionRecord[]> {
   return rows.map(toQuestion);
 }
 
-export async function getQuestion(db: Exec, id: string) {
-  const [q] = await db.select().from(questions).where(eq(questions.id, id));
+export async function getQuestion(db: Exec, id: string, lock = false) {
+  const query = db.select().from(questions).where(eq(questions.id, id));
+  const [q] = lock ? await query.for("update") : await query;
   return q ? toQuestion(q) : undefined;
 }
 
@@ -46,7 +47,8 @@ export async function setQuestionFeedback(db: Exec, id: string, feedback: "up" |
 /** 알아온 답 기록 → 그 항목은 완료. 알아올 것이 모두 끝나면 질문도 해결됨 */
 export async function answerMissing(db: Db, id: string, index: number, answer: string) {
   return db.transaction(async (tx) => {
-    const q = await getQuestion(tx, id);
+    // 행을 잠가 다른 기기에서 동시에 적은 답이 서로 덮어쓰지 않게
+    const q = await getQuestion(tx, id, true);
     if (!q || !q.missing[index]) return undefined;
     const missing = q.missing.map((m, i) => (i === index ? { ...m, done: true, answer: answer.trim() } : m));
     const status = missing.every((m) => m.done) ? "resolved" : q.status;
@@ -74,7 +76,8 @@ function moveTo(item: Item, from: string | undefined, to: string): Item {
 /** 수락한 변경만 항목에 반영 (한 번만) */
 export async function applyReschedule(db: Db, id: string, acceptedItemIds: string[]) {
   return db.transaction(async (tx) => {
-    const [p] = await tx.select().from(rescheduleProposals).where(eq(rescheduleProposals.id, id));
+    // 행을 잠가 두 탭에서 동시에 눌러도 날짜가 두 번 밀리지 않게
+    const [p] = await tx.select().from(rescheduleProposals).where(eq(rescheduleProposals.id, id)).for("update");
     if (!p || p.appliedAt) return 0;
     const accepted = new Set(acceptedItemIds);
     let count = 0;

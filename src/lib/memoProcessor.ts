@@ -1,4 +1,5 @@
 import { addDays, format, nextDay, parseISO, type Day } from "date-fns";
+import { isRealDate } from "@/lib/date";
 
 /**
  * 메모 처리기 — Decision model처럼 인터페이스로 분리해 두고, 실제로는 Claude로 교체한다.
@@ -110,7 +111,11 @@ function findDate(t: string, today: string): string {
   if (/모레/.test(t)) return format(addDays(base, 2), "yyyy-MM-dd");
   if (/내일/.test(t)) return format(addDays(base, 1), "yyyy-MM-dd");
   const md = t.match(/(\d{1,2})\s*[월/]\s*(\d{1,2})\s*일?/);
-  if (md) return `${today.slice(0, 4)}-${md[1].padStart(2, "0")}-${md[2].padStart(2, "0")}`;
+  if (md) {
+    // "3/40", "13월 2일"처럼 없는 날짜는 날짜로 보지 않는다
+    const d = `${today.slice(0, 4)}-${md[1].padStart(2, "0")}-${md[2].padStart(2, "0")}`;
+    if (isRealDate(d)) return d;
+  }
   const wd = t.match(/(다음\s?주\s?)?([일월화수목금토])요일/);
   if (wd) {
     const d = nextDay(base, WEEKDAY[wd[2]]);
@@ -127,6 +132,7 @@ function findTime(t: string): string | undefined {
   if (pm && h < 12) h += 12;
   if (!m[1] && h >= 1 && h <= 6) h += 12; // "3시 회의" → 오후 3시
   const min = m[4] ? Number(m[4]) : m[3]?.includes("반") ? 30 : 0;
+  if (h > 23 || min > 59) return undefined; // "오후 13시", "25시" 같은 없는 시각
   return `${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
 }
 

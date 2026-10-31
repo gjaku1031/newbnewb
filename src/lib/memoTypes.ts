@@ -3,7 +3,8 @@
  * 실제로는 DB memos 테이블 + Claude(MCP) 처리, 지금은 목업 규칙 처리기.
  */
 
-export type MemoStatus = "processing" | "done";
+/** failed: 처리 중 오류 — 화면에서 다시 정리할 수 있다 */
+export type MemoStatus = "processing" | "done" | "failed";
 
 /** Claude가 메모를 보고 한 일 */
 export type MemoActionKind = "create_event" | "create_task" | "ask" | "update_wiki" | "add_caution";

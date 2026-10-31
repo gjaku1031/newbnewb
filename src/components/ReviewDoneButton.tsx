@@ -7,8 +7,6 @@ import type { WikiReview } from "@/lib/types";
 import { fmt } from "@/lib/date";
 import { markReviewed, undoReviewed } from "@/components/wiki/store";
 
-export { nextInterval } from "@/lib/review";
-
 /** 복습했음 버튼: 누르면 다음 복습일이 뒤로 밀린다 (다시 누르면 되돌리기) */
 export function ReviewDoneButton({ slug, size = "md" }: { slug: string; size?: "sm" | "md" }) {
   const [done, setDone] = useState<{ prev: WikiReview; next: WikiReview } | null>(null);

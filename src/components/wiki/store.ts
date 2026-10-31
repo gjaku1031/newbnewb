@@ -1,10 +1,10 @@
 "use client";
 
 import type { WikiPage } from "@/lib/types";
-import type { PageContent, Revision, WikiComment } from "@/lib/wikiTypes";
+import type { Revision, WikiComment } from "@/lib/wikiTypes";
 import type { WikiData, WorkspaceSnapshot } from "@/lib/workspace";
 import { NOW } from "@/lib/today";
-import { getWorkspace, mutate, newClientId, refresh, useWorkspace } from "@/components/workspace/store";
+import { applyLocal, getWorkspace, mutate, newClientId, refresh, useWorkspace } from "@/components/workspace/store";
 import * as actions from "@/server/actions";
 
 /**
@@ -19,8 +19,6 @@ export function useWiki(): WikiState {
   return useWorkspace((s) => s.wiki);
 }
 
-const EMPTY: PageContent = { title: "", summary: "", body: "" };
-
 /* ───────── 조회 ───────── */
 
 export const findPage = (s: WikiState, slug: string) => s.pages.find((p) => p.slug === slug);
@@ -28,11 +26,6 @@ export const findPage = (s: WikiState, slug: string) => s.pages.find((p) => p.sl
 /** 지금 반영된 페이지 (스토어에 없으면 넘겨받은 값) */
 export function effectivePage(s: WikiState, base: WikiPage): WikiPage {
   return findPage(s, base.slug) ?? base;
-}
-
-export function currentContent(s: WikiState, slug: string): PageContent {
-  const p = findPage(s, slug);
-  return p ? { title: p.title, summary: p.summary, body: p.body } : EMPTY;
 }
 
 export const revisionsOf = (s: WikiState, slug: string) =>
@@ -50,31 +43,9 @@ export const pendingRevisions = (s: WikiState) =>
 
 const withWiki = (fn: (w: WikiState) => WikiState) => (s: WorkspaceSnapshot) => ({ ...s, wiki: fn(s.wiki) });
 
-/** 변경 제출 → 검토 중 상태의 새 버전 (검토 결과는 서버에서 끝나면 다시 불러와 반영) */
-export function submitRevision(slug: string, after: PageContent, message: string): Revision {
-  const s = getWikiState();
-  const version = Math.max(0, ...s.revisions.filter((r) => r.slug === slug).map((r) => r.version)) + 1;
-  const r: Revision = {
-    id: `${slug}-v${version}-${Date.now().toString(36)}`,
-    slug,
-    version,
-    at: NOW,
-    author: "me",
-    status: "reviewing",
-    message: message.trim() || "내용 수정",
-    before: currentContent(s, slug),
-    after,
-    conflicts: [],
-  };
-  void mutate(
-    withWiki((w) => ({ ...w, revisions: [...w.revisions, r] })),
-    () => actions.submitRevision({ id: r.id, slug, after, message }),
-  );
-  return r;
-}
-
-export function applyRevision(id: string) {
-  void mutate(
+/** 반영. 그 사이 문서가 바뀌었으면 서버가 확인 대기로 돌리므로 다시 불러와 보여준다 */
+export async function applyRevision(id: string) {
+  const applied = await mutate(
     withWiki((w) => {
       const r = w.revisions.find((x) => x.id === id);
       if (!r) return w;
@@ -88,6 +59,7 @@ export function applyRevision(id: string) {
     }),
     () => actions.applyRevision(id),
   );
+  if (applied === false) await refresh();
 }
 
 export function cancelRevision(id: string) {
@@ -149,7 +121,7 @@ const setPageReview = (slug: string, review: WikiPage["review"]) =>
 export async function markReviewed(slug: string) {
   const prev = findPage(getWikiState(), slug)?.review;
   const res = await mutate(null, () => actions.markReviewed(slug));
-  if (res) await mutate(setPageReview(slug, res.next), async () => undefined);
+  if (res) applyLocal(setPageReview(slug, res.next));
   return prev && res ? { prev, next: res.next } : null;
 }
 

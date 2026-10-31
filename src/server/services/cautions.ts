@@ -5,6 +5,7 @@ import type { Caution } from "@/lib/types";
 import { nextInterval } from "@/lib/review";
 import { seoulToday } from "@/lib/today";
 import { cautions, cautionTags, cautionWiki, tags, wikiPages } from "@/server/db/schema";
+import { existing } from "@/server/db/existing";
 import { dOut, opt } from "@/server/db/convert";
 import type { Db, Exec } from "@/server/db/types";
 import { newId } from "@/server/ids";
@@ -60,10 +61,8 @@ export async function writeCaution(tx: Exec, c: Caution) {
 
   await tx.delete(cautionWiki).where(eq(cautionWiki.cautionId, c.id));
   await tx.delete(cautionTags).where(eq(cautionTags.cautionId, c.id));
-  const slugs = new Set((await tx.select({ slug: wikiPages.slug }).from(wikiPages)).map((p) => p.slug));
-  const tagIds = new Set((await tx.select({ id: tags.id }).from(tags)).map((t) => t.id));
-  const refs = [...new Set(c.wikiRefs)].filter((s) => slugs.has(s));
-  const tagList = [...new Set(c.tags)].filter((t) => tagIds.has(t));
+  const refs = await existing(tx, wikiPages, wikiPages.slug, c.wikiRefs);
+  const tagList = await existing(tx, tags, tags.id, c.tags);
   if (refs.length) await tx.insert(cautionWiki).values(refs.map((slug, sort) => ({ cautionId: c.id, slug, sort })));
   if (tagList.length) await tx.insert(cautionTags).values(tagList.map((tagId, sort) => ({ cautionId: c.id, tagId, sort })));
 }

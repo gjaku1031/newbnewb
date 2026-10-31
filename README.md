@@ -84,7 +84,7 @@
 - [Agentation](https://www.agentation.com/) — 화면에 주석을 달아 Claude Code로 QA (로그인 사용자만, `/api/agentation` 프록시)
 - Drizzle ORM + mysql2, zod(서버 액션 입력 검증), Docker(Next.js standalone)
 - 파일 저장: 운영은 OCI SDK(서버 인증, 비밀키 없음), 로컬은 AWS S3 SDK(RustFS)
-- 테스트: Vitest + Testcontainers(MySQL)
+- 테스트: Vitest + Testcontainers(MySQL), Playwright e2e
 - 예정: Passkey(WebAuthn), MCP 서버(`/api/mcp`), oci-prod 배포(arm64 + Caddy)
 
 ## 시작하기
@@ -110,6 +110,8 @@ npm run dev          # http://localhost:3000
 - 스키마 변경: `src/server/db/schema.ts` 수정 → `npm run db:generate` → `npm run db:migrate`
 - 초기화: `docker compose down -v` (데이터까지 삭제)
 - 테스트: `npm test` — 운영과 같은 MySQL 26.10.0을 Testcontainers로 띄워 저장·위키 검토·메모 처리·재배치를 검증 (Docker 필요)
+- e2e: `npm run test:e2e` — 격리된 MySQL·S3와 e2e 전용 개발 서버(포트 3100, 빌드 폴더 `.next-e2e`)를 띄워 브라우저로 주요 흐름을 검증. 평소 개발 서버·DB는 건드리지 않습니다 (Docker 필요, 처음 한 번 `npx playwright install chromium`)
+  - 결과: `test-results/report` (실패하면 스크린샷·trace), 서버 로그: `/tmp/newb-e2e/next-dev.log`
 
 ### 데이터 흐름
 
@@ -119,7 +121,9 @@ npm run dev          # http://localhost:3000
 바꾸기     화면을 먼저 바꾸고 → 서버 액션(로그인 확인 + zod 검증) → DB
            실패하면 서버 값으로 되돌리고 오류 표시
 서버 처리   위키 검토·메모 처리는 응답 뒤 after()로 실행, 화면은 끝날 때까지 /api/workspace를 다시 불러옴
-           서버가 재시작돼 멈춘 처리는 다음 /api/workspace 요청 때 다시 돌림
+           서버가 재시작돼 멈춘 처리는 다음 /api/workspace 요청 때 다시 돌림 (먼저 점유해서 한 번만)
+           처리기가 실패하면 메모는 '실패'(다시 정리 가능), 위키 변경은 '확인 필요'로 남김
+           위키 변경은 만든 뒤 문서가 바뀌었으면 덮어쓰지 않고 '확인 필요'로 돌림
 원본 파일   POST /api/sources → Object Storage + sources 테이블, GET /api/sources/{id}/file로 내려받기
 ```
 
@@ -188,6 +192,7 @@ src/
 drizzle/                   DB 마이그레이션 SQL
 scripts/                   마이그레이션·시드 실행기
 test/                      통합 테스트 (Testcontainers MySQL)
+e2e/                       브라우저 e2e (Playwright) — global-setup이 격리된 DB·S3·개발 서버를 띄움
 compose.yaml · Dockerfile  로컬 인프라 · 앱 이미지
 docs/PLAN.md               기획·결정 기록
 ```

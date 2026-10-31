@@ -5,7 +5,7 @@ import { Fragment } from "react";
 import { headingId, type TitleOf } from "@/lib/markdownText";
 import { useTitleOf } from "@/components/workspace/hooks";
 
-export { extractHeadings, plainLine } from "@/lib/markdownText";
+export { extractHeadings } from "@/lib/markdownText";
 
 /**
  * 위키 본문용 아주 작은 마크다운 렌더러.

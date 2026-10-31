@@ -18,7 +18,7 @@ import {
 import { sql } from "drizzle-orm";
 import type { MissingItem, QuestionRecord, RescheduleItem, WikiPage } from "@/lib/types";
 import type { Conflict, EditNote, PageContent, WikiComment } from "@/lib/wikiTypes";
-import type { MemoResult } from "@/lib/memoTypes";
+import type { MemoResult, MemoStatus } from "@/lib/memoTypes";
 
 /*
  * 날짜·시간 규칙
@@ -264,7 +264,7 @@ export const memos = mysqlTable("memos", {
   id: varchar("id", { length: 64 }).primaryKey(),
   text: text("text").notNull(),
   at: datetime("at", { mode: "string" }).notNull(),
-  status: varchar("status", { length: 12 }).$type<"processing" | "done">().notNull(),
+  status: varchar("status", { length: 12 }).$type<MemoStatus>().notNull(),
   result: json("result").$type<MemoResult>(),
   createdAt: createdAt(),
   updatedAt: updatedAt(),

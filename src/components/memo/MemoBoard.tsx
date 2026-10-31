@@ -7,7 +7,7 @@ import { BookOpen, CalendarPlus, HelpCircle, ListPlus, Loader2, ShieldAlert, Spa
 import type { Memo, MemoAction, MemoActionKind } from "@/lib/memoTypes";
 import { fmt } from "@/lib/date";
 import { useWiki } from "@/components/wiki/store";
-import { addMemo, deleteMemo, useMemos } from "./store";
+import { addMemo, deleteMemo, retryMemo, useMemos } from "./store";
 import { ItemLink } from "@/components/item/ItemPeek";
 
 const ACTION_ICON: Record<MemoActionKind, typeof CalendarPlus> = {
@@ -137,7 +137,18 @@ function MemoCard({ memo }: { memo: Memo }) {
           <Sparkles className="size-3.5" />
           Claude 정리
         </div>
-        {memo.status === "processing" || !memo.result ? (
+        {memo.status === "failed" ? (
+          <div className="flex items-center gap-3 py-1 text-[13.5px]">
+            <span className="text-danger">정리하지 못했어요</span>
+            <button
+              type="button"
+              onClick={() => retryMemo(memo.id)}
+              className="rounded-md border border-line px-2.5 py-1 text-[12.5px] font-medium hover:bg-sunken"
+            >
+              다시 정리
+            </button>
+          </div>
+        ) : memo.status === "processing" || !memo.result ? (
           <div className="flex items-center gap-2 py-2 text-[13.5px] text-muted">
             <Loader2 className="size-4 animate-spin" />
             정리 중

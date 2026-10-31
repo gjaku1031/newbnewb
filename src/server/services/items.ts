@@ -2,7 +2,8 @@ import "server-only";
 import { asc, eq, inArray } from "drizzle-orm";
 import type { Tag } from "@/lib/items";
 import type { Item, ItemStatus, Priority } from "@/lib/types";
-import { itemSubItems, items, itemTags, itemWikiRefs, tags } from "@/server/db/schema";
+import { itemSubItems, items, itemTags, itemWikiRefs, tags, wikiPages } from "@/server/db/schema";
+import { existing } from "@/server/db/existing";
 import { dOut, dtIn, dtOut, opt } from "@/server/db/convert";
 import type { Db, Exec } from "@/server/db/types";
 
@@ -100,11 +101,12 @@ export async function writeItem(tx: Exec, item: Item) {
       .insert(itemSubItems)
       .values(item.subItems.map((s, sort) => ({ itemId: item.id, id: s.id, title: s.title, done: s.done, sort })));
   }
-  const tagIds = [...new Set(item.tags)];
+  // 그 사이 지워진 태그·위키를 가리켜도 저장 전체가 FK 오류로 실패하지 않게 있는 것만 남긴다
+  const tagIds = await existing(tx, tags, tags.id, item.tags);
   if (tagIds.length) {
     await tx.insert(itemTags).values(tagIds.map((tagId, sort) => ({ itemId: item.id, tagId, sort })));
   }
-  const slugs = [...new Set(item.wikiRefs)];
+  const slugs = await existing(tx, wikiPages, wikiPages.slug, item.wikiRefs);
   if (slugs.length) {
     await tx.insert(itemWikiRefs).values(slugs.map((slug, sort) => ({ itemId: item.id, slug, sort })));
   }

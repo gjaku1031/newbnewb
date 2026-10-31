@@ -1,13 +1,19 @@
 import "server-only";
 import { z } from "zod";
+import { isRealDate } from "@/lib/date";
 import { ID_PATTERN } from "@/server/ids";
 
 /** 서버 액션은 누구나 POST로 부를 수 있어서, 들어오는 값은 전부 여기서 검증한다 */
 
 export const Id = z.string().regex(ID_PATTERN);
 export const Slug = z.string().regex(/^[a-z0-9][a-z0-9-]{0,127}$/);
-const LocalDateTime = z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/);
-const LocalDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+/** 형식뿐 아니라 달력에 있는 날짜·시각인지까지 (2026-02-31은 DB에서 오류가 나므로 여기서 막는다) */
+const LocalDate = z.string().refine(isRealDate, "없는 날짜예요");
+const LocalDateTime = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}T([01]\d|2[0-3]):[0-5]\d$/)
+  .refine((v) => isRealDate(v.slice(0, 10)), "없는 날짜예요");
+export const RevisionId = z.string().regex(/^[A-Za-z0-9_-]{1,128}$/);
 const Short = (max: number) => z.string().max(max);
 
 export const ItemInput = z.object({
@@ -21,7 +27,10 @@ export const ItemInput = z.object({
   priority: z.enum(["P0", "P1", "P2", "P3", "P4", "P5"]).optional(),
   status: z.enum(["todo", "doing", "waiting", "done"]).optional(),
   tags: z.array(Id).max(50),
-  subItems: z.array(z.object({ id: Id, title: Short(500), done: z.boolean() })).max(200),
+  subItems: z
+    .array(z.object({ id: Id, title: Short(500), done: z.boolean() }))
+    .max(200)
+    .refine((list) => new Set(list.map((s) => s.id)).size === list.length, "하위 항목 id가 겹쳐요"),
   from: Short(255).optional(),
   description: Short(20_000).optional(),
   location: Short(255).optional(),
@@ -44,7 +53,7 @@ export const PageContentInput = z.object({
 });
 
 export const RevisionInput = z.object({
-  id: z.string().regex(/^[A-Za-z0-9_-]{1,128}$/),
+  id: RevisionId,
   slug: Slug,
   after: PageContentInput,
   message: Short(500),

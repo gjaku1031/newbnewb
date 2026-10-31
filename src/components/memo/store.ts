@@ -25,6 +25,14 @@ export function addMemo(text: string): string {
   return memo.id;
 }
 
+/** 처리에 실패한 메모를 다시 정리 */
+export function retryMemo(id: string) {
+  void mutate(
+    (s) => ({ ...s, memos: s.memos.map((m) => (m.id === id ? { ...m, status: "processing" } : m)) }),
+    () => actions.retryMemo(id),
+  );
+}
+
 export function deleteMemo(id: string) {
   void mutate(
     (s) => ({ ...s, memos: s.memos.filter((m) => m.id !== id) }),
