@@ -68,7 +68,7 @@ function SidebarContent({ onNavigate, onCollapse }: { onNavigate?: () => void; o
         </div>
         <div className="leading-tight">
           <div className="text-[15px] font-semibold">newb</div>
-          <div className="text-[11.5px] text-muted">김뉴비 · 사업기획팀</div>
+          <div className="text-[11.5px] text-muted">신입 업무 도우미</div>
         </div>
         {onCollapse && (
           <button
@@ -133,15 +133,17 @@ function SidebarContent({ onNavigate, onCollapse }: { onNavigate?: () => void; o
           <Settings className="size-[17px]" strokeWidth={1.9} />
           설정
         </Link>
-        <div className="rounded-lg bg-surface px-3 py-2.5 ring-1 ring-line">
-          <div className="flex items-center gap-2 text-[12.5px] font-medium">
-            <span className="relative flex size-2">
-              <span className="absolute inline-flex size-full animate-ping rounded-full bg-ok opacity-50" />
-              <span className="relative inline-flex size-2 rounded-full bg-ok" />
-            </span>
-            Claude Desktop 연결됨
+        {/* TODO(MCP): 실제 연결 상태 */}
+        <Link
+          href="/settings#claude"
+          onClick={onNavigate}
+          className="block rounded-lg bg-surface px-3 py-2.5 ring-1 ring-line hover:bg-black/[0.02] dark:hover:bg-white/[0.03]"
+        >
+          <div className="flex items-center gap-2 text-[12.5px] font-medium text-muted">
+            <span className="inline-flex size-2 rounded-full bg-faint" />
+            Claude Desktop 연결 전
           </div>
-        </div>
+        </Link>
       </div>
     </div>
   );

@@ -30,7 +30,7 @@ test("작업공간 스냅샷에 서버 전용 정보(사람 이름·내부 메�
   const res = await request.get("/api/workspace");
   expect(res.status()).toBe(200);
   const body = await res.text();
-  // 시드의 사람 이름(src/mocks/wikiInternal.ts)은 DB에만 있고 화면으로 나가면 안 된다
+  // 시드의 사람 이름(test/fixtures/mocks/wikiInternal.ts)은 DB에만 있고 화면으로 나가면 안 된다
   for (const name of ["박지훈", "김서연", "이민호"]) {
     expect(body, `${name}이(가) 스냅샷에 있으면 안 돼요`).not.toContain(name);
   }

@@ -1,6 +1,6 @@
 import type { WikiPage } from "@/lib/types";
 import type { PageContent, Revision } from "@/lib/wikiTypes";
-import { wikiPages } from "@/mocks/wiki";
+import { wikiPages } from "./wiki";
 
 /** 위키 과거 변경 이력 목데이터 (시드용) */
 const content = (p: WikiPage): PageContent => ({ title: p.title, summary: p.summary, body: p.body });

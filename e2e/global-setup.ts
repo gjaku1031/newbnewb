@@ -49,7 +49,7 @@ export default async function globalSetup() {
 
   await createBucket(env);
   execFileSync("npm", ["run", "--silent", "db:migrate"], { cwd: root, env, stdio: "inherit" });
-  execFileSync("npm", ["run", "--silent", "db:seed", "--", "--force"], { cwd: root, env, stdio: "inherit" });
+  execFileSync("npm", ["run", "--silent", "test:seed", "--", "--force"], { cwd: root, env, stdio: "inherit" });
 
   const log = openSync(path.join(logDir, "next-dev.log"), "w");
   const server = spawn("npx", ["next", "dev", "-H", "127.0.0.1", "-p", String(E2E_PORT)], {

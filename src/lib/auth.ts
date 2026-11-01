@@ -16,7 +16,7 @@ export interface SessionUser {
 export async function getCurrentUser(_request?: Request): Promise<SessionUser | null> {
   void _request;
   if (process.env.NODE_ENV === "development") {
-    return { id: "me", name: "김뉴비" };
+    return { id: "me", name: "개발용 사용자" };
   }
   return null;
 }

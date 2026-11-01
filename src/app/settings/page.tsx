@@ -37,7 +37,9 @@ export default function SettingsPage() {
               <AiSettings />
             </Suspense>
             <AccountSettings />
-            <DataSettings />
+            <Suspense fallback={null}>
+              <DataSettings />
+            </Suspense>
           </div>
         </div>
       </PageBody>

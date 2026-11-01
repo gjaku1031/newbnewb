@@ -95,7 +95,6 @@ npm install
 cp .env.example .env.local
 npm run infra:up     # MySQL + S3(RustFS) + 버킷 생성 (Docker)
 npm run db:migrate   # 테이블 생성
-npm run db:seed      # 목데이터 넣기 (비어 있을 때만, --force면 지우고 다시)
 npm run dev          # http://localhost:3000
 ```
 
@@ -143,7 +142,7 @@ npm run dev          # http://localhost:3000
 | `/srv/newb/anthropic.env` | `ANTHROPIC_API_KEY` (선택: `CLAUDE_MODEL`, 기본 `claude-opus-5-5`) → 메모 정리·위키 편집·모순 검토 |
 
 - 배포: **main에 푸시하면 자동**. GitHub Actions가 검사·e2e 후 arm64 이미지를 GHCR에 올리고, oci-prod 타이머가 2분 안에 가져가 마이그레이션 → 교체 → 상태 확인(실패 시 되돌림) — [infra/oci](infra/oci/README.md#3-배포-cicd--deploy)
-- 시드(`db:seed`)는 개발용이라 운영 DB에는 넣지 않습니다.
+- 앱에는 목데이터가 없습니다. 테스트용 목데이터·시드는 `test/fixtures`에만 있고(`npm run test:seed`, e2e가 격리된 DB에 넣음), 개발·운영 DB는 빈 상태에서 시작합니다.
 
 다른 기기(같은 Tailscale 망 등)에서 개발 서버에 접속하려면 `.env.local`에 허용할 주소를 적습니다.
 
@@ -189,12 +188,11 @@ src/
 │  ├─ services/            도메인 로직 (항목·위키·메모·질문·재배치·원본·작업공간) — 테스트 대상
 │  ├─ actions.ts           서버 액션 (로그인 확인 → 검증 → 서비스)
 │  ├─ validation.ts        입력 검증 (zod)
-│  ├─ seed.ts              목데이터 시드
 │  └─ storage*.ts          Object Storage — OCI SDK(운영) / S3(로컬)
-└─ mocks/                  목데이터 — 시드·테스트에서만 사용 (wikiInternal.ts는 server-only)
 drizzle/                   DB 마이그레이션 SQL
-scripts/                   마이그레이션·시드 실행기
+scripts/                   마이그레이션 실행기
 test/                      통합 테스트 (Testcontainers MySQL)
+└─ fixtures/               테스트 전용 목데이터·시드 (앱 코드는 쓰지 않음)
 e2e/                       브라우저 e2e (Playwright) — global-setup이 격리된 DB·S3·개발 서버를 띄움
 compose.yaml · Dockerfile  로컬 인프라 · 앱 이미지
 docs/PLAN.md               기획·결정 기록

@@ -2,7 +2,7 @@ import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import type { Item } from "@/lib/types";
 import type { WikiReviewer } from "@/lib/wikiReview";
-import { seedDemo } from "@/server/seed";
+import { seedDemo } from "./fixtures/seed";
 import { memos } from "@/server/db/schema";
 import * as items from "@/server/services/items";
 import * as wiki from "@/server/services/wiki";

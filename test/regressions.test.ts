@@ -4,7 +4,7 @@ import type { MemoProcessor } from "@/lib/memoProcessor";
 import { RuleMemoProcessor } from "@/lib/memoProcessor";
 import type { WikiReviewer } from "@/lib/wikiReview";
 import type { WikiEditor } from "@/lib/wikiEditor";
-import { seedDemo } from "@/server/seed";
+import { seedDemo } from "./fixtures/seed";
 import { memos, wikiRevisions } from "@/server/db/schema";
 import * as items from "@/server/services/items";
 import * as wiki from "@/server/services/wiki";

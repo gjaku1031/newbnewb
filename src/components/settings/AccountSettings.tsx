@@ -1,40 +1,21 @@
-import { Database, Download, KeyRound, Laptop, Smartphone, Tablet, Trash2 } from "lucide-react";
+import { sql } from "drizzle-orm";
+import { connection } from "next/server";
+import { Database, Download, KeyRound } from "lucide-react";
 import { Button } from "@/components/ui";
+import { getCurrentUser } from "@/lib/auth";
+import { getDb } from "@/server/db/client";
+import { sources } from "@/server/db/schema";
 import { Row, SettingsSection } from "./Section";
-
-const PASSKEYS = [
-  { id: "pk1", name: "Windows Hello · 회사 노트북", icon: Laptop, added: "2026-10-20", last: "오늘 08:52" },
-  { id: "pk2", name: "iPhone (iCloud 키체인)", icon: Smartphone, added: "2026-10-20", last: "어제 21:14" },
-  { id: "pk3", name: "iPad (iCloud 키체인)", icon: Tablet, added: "2026-10-24", last: "10/28" },
-];
 
 export function AccountSettings() {
   return (
-    <SettingsSection
-      id="account"
-      title="로그인"
-      icon={<KeyRound className="size-4" />}
-    >
-      <ul className="divide-y divide-line">
-        {PASSKEYS.map((p) => (
-          <li key={p.id} className="flex items-center gap-3 px-6 py-3.5">
-            <span className="grid size-9 place-items-center rounded-lg bg-sunken text-muted">
-              <p.icon className="size-[18px]" strokeWidth={1.8} />
-            </span>
-            <div className="min-w-0 flex-1">
-              <div className="text-[14px] font-medium">{p.name}</div>
-              <div className="text-[12.5px] text-muted tabular">
-                등록 {p.added} · 마지막 사용 {p.last}
-              </div>
-            </div>
-            <Button variant="ghost" size="sm" aria-label={`${p.name} 삭제`}>
-              <Trash2 className="size-4" />
-            </Button>
-          </li>
-        ))}
-      </ul>
-      <div className="px-6 py-3.5">
-        <Button size="sm">
+    <SettingsSection id="account" title="로그인" icon={<KeyRound className="size-4" />}>
+      {/* TODO(Passkey): 등록한 Passkey 목록·추가·삭제 */}
+      <div className="px-6 py-4 text-[13.5px] text-muted">
+        등록한 Passkey가 없어요. Passkey 로그인은 준비 중이에요.
+      </div>
+      <div className="px-6 pb-4">
+        <Button size="sm" disabled>
           <KeyRound className="size-3.5" />이 기기에 Passkey 추가
         </Button>
       </div>
@@ -42,7 +23,25 @@ export function AccountSettings() {
   );
 }
 
-export function DataSettings() {
+function formatBytes(n: number) {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 ** 2) return `${(n / 1024).toFixed(1)} KB`;
+  if (n < 1024 ** 3) return `${(n / 1024 ** 2).toFixed(1)} MB`;
+  return `${(n / 1024 ** 3).toFixed(1)} GB`;
+}
+
+/** 올린 원본 문서 수·용량 (DB 기준). 로그인하지 않았으면 보여주지 않는다 */
+export async function DataSettings() {
+  await connection();
+  const user = await getCurrentUser();
+  let usage = "—";
+  if (user) {
+    const [row] = await getDb()
+      .select({ count: sql<number>`count(*)`, bytes: sql<string | null>`sum(${sources.sizeBytes})` })
+      .from(sources);
+    const count = Number(row?.count ?? 0);
+    usage = count === 0 ? "아직 없어요" : `${count}개 · ${formatBytes(Number(row?.bytes ?? 0))}`;
+  }
   return (
     <SettingsSection id="data" title="데이터" icon={<Database className="size-4" />}>
       <Row label="위키 내보내기">
@@ -52,7 +51,7 @@ export function DataSettings() {
         </Button>
       </Row>
       <Row label="원본 문서">
-        <span className="text-[13px] text-muted tabular">48.2 MB</span>
+        <span className="text-[13px] text-muted tabular">{usage}</span>
       </Row>
     </SettingsSection>
   );

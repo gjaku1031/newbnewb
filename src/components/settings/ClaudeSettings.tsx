@@ -27,9 +27,10 @@ export function ClaudeSettings() {
       <div className="space-y-3 px-6 py-4">
         <div className="flex items-center justify-between gap-3">
           <div className="text-[14px] font-medium">MCP 서버 URL</div>
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-ok-soft px-2.5 py-0.5 text-[12px] font-semibold text-ok">
-            <span className="size-1.5 rounded-full bg-ok" />
-            연결됨 · 마지막 호출 11:48
+          {/* TODO(MCP): 실제 연결 상태·마지막 호출 시각 */}
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-sunken px-2.5 py-0.5 text-[12px] font-semibold text-muted">
+            <span className="size-1.5 rounded-full bg-faint" />
+            준비 중
           </span>
         </div>
         <div className="flex items-center gap-2 rounded-lg border border-line bg-bg px-3 py-2">

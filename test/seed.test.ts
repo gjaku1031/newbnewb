@@ -1,13 +1,13 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { items as mockItems } from "@/mocks/items";
-import { memos as mockMemos } from "@/mocks/memos";
-import { cautions as mockCautions } from "@/mocks/cautions";
-import { questions as mockQuestions } from "@/mocks/questions";
-import { rescheduleProposal } from "@/mocks/reschedule";
-import { eveningBriefing, morningBriefing } from "@/mocks/briefing";
-import { wikiPages as mockPages, sources as mockSources } from "@/mocks/wiki";
-import { seedRevisions } from "@/mocks/wikiRevisions";
-import { seedDemo } from "@/server/seed";
+import { items as mockItems } from "./fixtures/mocks/items";
+import { memos as mockMemos } from "./fixtures/mocks/memos";
+import { cautions as mockCautions } from "./fixtures/mocks/cautions";
+import { questions as mockQuestions } from "./fixtures/mocks/questions";
+import { rescheduleProposal } from "./fixtures/mocks/reschedule";
+import { eveningBriefing, morningBriefing } from "./fixtures/mocks/briefing";
+import { wikiPages as mockPages, sources as mockSources } from "./fixtures/mocks/wiki";
+import { seedRevisions } from "./fixtures/mocks/wikiRevisions";
+import { seedDemo } from "./fixtures/seed";
 import { loadWorkspace } from "@/server/services/workspace";
 import { testDb } from "./db";
 

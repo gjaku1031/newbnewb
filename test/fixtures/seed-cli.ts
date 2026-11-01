@@ -1,6 +1,6 @@
-// 개발용 목데이터 시드: npm run db:seed (비어 있을 때만) / npm run db:seed -- --force (모두 지우고 다시)
+// 테스트용 목데이터 시드 (e2e global-setup이 부름): npm run test:seed -- --force
 import { getDb, getPool } from "@/server/db/client";
-import { seedDemo } from "@/server/seed";
+import { seedDemo } from "./seed";
 
 async function main() {
   const force = process.argv.includes("--force");
