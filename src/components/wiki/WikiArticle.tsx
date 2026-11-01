@@ -185,7 +185,6 @@ export function WikiArticle({
   const request = async () => {
     setRequesting(true);
     setJustApplied(null);
-    await new Promise((r) => window.setTimeout(r, 600));
     const r = await requestClaudeEdit(base.slug);
     setRequesting(false);
     if (r) setJustApplied(r.id);

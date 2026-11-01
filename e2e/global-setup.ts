@@ -43,6 +43,8 @@ export default async function globalSetup() {
     NEXT_DIST_DIR: ".next-e2e",
     // 주석 툴바가 진짜 주석 서버로 보내지 않게
     AGENTATION_URL: "http://127.0.0.1:9",
+    // 실제 Claude API를 부르지 않고 규칙 처리기로 (결과가 매번 같아야 함)
+    ANTHROPIC_API_KEY: "",
   };
 
   await createBucket(env);

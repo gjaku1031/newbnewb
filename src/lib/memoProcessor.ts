@@ -2,7 +2,7 @@ import { addDays, format, nextDay, parseISO, type Day } from "date-fns";
 import { isRealDate } from "@/lib/date";
 
 /**
- * 메모 처리기 — Decision model처럼 인터페이스로 분리해 두고, 실제로는 Claude로 교체한다.
+ * 메모 처리기 인터페이스. 운영에선 Claude(src/server/ai/memo.ts), 키가 없으면 아래 규칙 목업.
  * 입력: 러프한 메모 원문 / 출력: 정리본 + 만들 항목·알아올 것·위키 갱신 계획
  */
 
@@ -44,9 +44,16 @@ export interface MemoPlan {
   cautions: PlannedCaution[];
 }
 
+/** 처리기가 고를 수 있는 위키 페이지 */
+export interface WikiPageRef {
+  slug: string;
+  title: string;
+  summary: string;
+}
+
 export interface MemoProcessor {
   id: string;
-  process(text: string, today: string): Promise<MemoPlan>;
+  process(text: string, today: string, pages: WikiPageRef[]): Promise<MemoPlan>;
 }
 
 /* ───────── 목업 규칙 처리기 ───────── */
@@ -190,4 +197,3 @@ export class RuleMemoProcessor implements MemoProcessor {
   }
 }
 
-export const memoProcessor: MemoProcessor = new RuleMemoProcessor();

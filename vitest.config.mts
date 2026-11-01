@@ -15,6 +15,8 @@ export default defineConfig({
     // 한 MySQL을 함께 쓰므로 파일을 순서대로
     fileParallelism: false,
     testTimeout: 30_000,
+    // 테스트는 실제 Claude API를 부르지 않는다 (규칙 처리기 또는 가짜 처리기)
+    env: { ANTHROPIC_API_KEY: "" },
     hookTimeout: 180_000,
   },
 });

@@ -1,13 +1,14 @@
+import { Suspense } from "react";
 import { PageBody, PageHeader } from "@/components/ui";
 import { DashboardSettings } from "@/components/settings/DashboardSettings";
 import { ClaudeSettings } from "@/components/settings/ClaudeSettings";
-import { DecisionSettings } from "@/components/settings/DecisionSettings";
 import { AccountSettings, DataSettings } from "@/components/settings/AccountSettings";
+import { AiSettings } from "@/components/settings/AiSettings";
 
 const SECTIONS = [
   { id: "dashboard", label: "대시보드 알림" },
   { id: "claude", label: "Claude Desktop 연결" },
-  { id: "decision", label: "Decision Model" },
+  { id: "ai", label: "Claude API" },
   { id: "account", label: "로그인" },
   { id: "data", label: "데이터" },
 ];
@@ -32,7 +33,9 @@ export default function SettingsPage() {
           <div className="space-y-6">
             <DashboardSettings />
             <ClaudeSettings />
-            <DecisionSettings />
+            <Suspense fallback={null}>
+              <AiSettings />
+            </Suspense>
             <AccountSettings />
             <DataSettings />
           </div>

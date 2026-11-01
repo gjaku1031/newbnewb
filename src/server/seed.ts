@@ -132,7 +132,6 @@ export async function seedDemo(db: Db, { force = false } = {}) {
           question: q.question,
           verdict: q.verdict,
           confidence: q.confidence,
-          signals: q.signals,
           rationale: q.rationale,
           answer: q.answer ?? null,
           citations: q.citations,

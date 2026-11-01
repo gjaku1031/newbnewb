@@ -2,21 +2,15 @@
 
 import Link from "next/link";
 import { ArrowLeft, ArrowUpRight, BookOpen, ListPlus, Scale, Sparkles, Target } from "lucide-react";
-import { Button, Card, CardTitle, EmptyState, PageBody, SignalBar, VerdictBadge } from "@/components/ui";
+import { Button, Card, CardTitle, EmptyState, PageBody, VerdictBadge } from "@/components/ui";
 import { useQuestion, useWikiPages } from "@/components/workspace/hooks";
 import { useItems } from "@/lib/itemStore";
 import { fmt } from "@/lib/date";
 import { Markdown } from "@/lib/markdown";
-import { signalLabel } from "@/lib/labels";
-import type { QuestionRecord } from "@/lib/types";
 import { FeedbackBar } from "./FeedbackBar";
 import { MissingItemCard } from "./MissingItemCard";
 import { ItemLink } from "@/components/item/ItemPeek";
 import { SaveAsCaution } from "@/components/caution/SaveAsCaution";
-
-/** 값이 높을수록 나쁜 신호 */
-const INVERTED: (keyof QuestionRecord["signals"])[] = ["conflict", "risk", "ambiguity"];
-const SIGNAL_ORDER: (keyof QuestionRecord["signals"])[] = ["coverage", "conflict", "freshness", "risk", "ambiguity"];
 
 export function QuestionDetail({ id }: { id: string }) {
   const q = useQuestion(id);
@@ -139,15 +133,9 @@ export function QuestionDetail({ id }: { id: string }) {
         {/* 판정 근거 */}
         <aside className="space-y-4">
           <Card>
-            <CardTitle icon={<Scale className="size-4" />}>왜 이렇게 판단했나</CardTitle>
+            <CardTitle icon={<Scale className="size-4" />}>Claude가 이렇게 답한 이유</CardTitle>
             <div className="px-5 pb-5">
               <p className="text-[14px] leading-relaxed">{q.rationale}</p>
-
-              <div className="mt-5 space-y-2.5">
-                {SIGNAL_ORDER.map((k) => (
-                  <SignalBar key={k} label={signalLabel[k]} value={q.signals[k]} invert={INVERTED.includes(k)} />
-                ))}
-              </div>
             </div>
           </Card>
 

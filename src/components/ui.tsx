@@ -239,27 +239,3 @@ export function EmptyState({ title, children }: { title: string; children?: Reac
     </div>
   );
 }
-
-/** 0~1 신호값 막대 (판정 근거 표시용) */
-export function SignalBar({
-  label,
-  value,
-  invert = false,
-}: {
-  label: string;
-  value: number;
-  /** true면 값이 높을수록 나쁨(충돌·위험·모호성) */
-  invert?: boolean;
-}) {
-  const good = invert ? 1 - value : value;
-  const color = good >= 0.7 ? "var(--ok)" : good >= 0.4 ? "var(--warn)" : "var(--danger)";
-  return (
-    <div className="grid grid-cols-[96px_1fr_36px] items-center gap-3 text-[13px]">
-      <span className="text-muted">{label}</span>
-      <div className="h-1.5 overflow-hidden rounded-full bg-sunken">
-        <div className="h-full rounded-full" style={{ width: `${value * 100}%`, background: color }} />
-      </div>
-      <span className="text-right tabular text-muted">{Math.round(value * 100)}</span>
-    </div>
-  );
-}

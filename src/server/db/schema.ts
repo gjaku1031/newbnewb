@@ -276,7 +276,6 @@ export const questions = mysqlTable("questions", {
   question: text("question").notNull(),
   verdict: varchar("verdict", { length: 24 }).$type<QuestionRecord["verdict"]>().notNull(),
   confidence: double("confidence").notNull(),
-  signals: json("signals").$type<QuestionRecord["signals"]>().notNull(),
   rationale: text("rationale").notNull(),
   answer: text("answer"),
   citations: json("citations").$type<QuestionRecord["citations"]>().notNull(),

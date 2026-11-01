@@ -45,7 +45,7 @@
             │  retrieve (근거 수집)
             ▼
    질문 ──► ┌──────────────────┐
-            │  Decision Model  │  "지금 근거로 확답 가능한가?" 판정
+            │   Claude 판단    │  "지금 근거로 확답 가능한가?" 판정
             └──────────────────┘
           ┌──────┼───────────────┐
           ▼      ▼               ▼
@@ -59,11 +59,12 @@
 
 - **성장 메커니즘**: 알아온 답·피드백(👍/👎, "이건 틀렸어")이 위키에 반영되고, 판정 결과가 실제로 맞았는지 기록해 **판정 기준을 보정**. 사용자 작업 스타일(선호 형식, 자주 하는 실수)도 프로필로 누적.
 
-### Decision Model (제안안)
-LLM 하나에 "확실하냐"고 묻는 대신, **판정 근거를 구조화된 점수로 뽑고 규칙으로 결정**하는 하이브리드:
+### ~~Decision Model~~ → 2026-11-01 제외
+처음엔 근거 커버리지·충돌·신선도·위험도·모호성 점수를 뽑아 규칙으로 판정하는 별도 모델을 계획했지만,
+**Claude가 근거를 읽고 직접 판단해도 충분**하다고 보고 뺐다. 판정 결과 3종(확답·조건부 답·알아올 것)과
+"왜 이렇게 답했는지" 설명은 그대로 남긴다. 판정 신호 점수(`questions.signals`)와 설정 화면의 판정 기준값은 삭제.
 
-| 신호 | 설명 |
-|---|---|
+---|---|
 | 근거 커버리지 | 질문의 하위 요구사항 중 위키 근거로 뒷받침되는 비율 |
 | 근거 충돌 | 서로 다른 문서/조언이 상충하는지 |
 | 근거 신선도 | 근거 문서가 오래됐거나 "구버전" 표시가 있는지 |
@@ -110,7 +111,7 @@ LLM 하나에 "확실하냐"고 묻는 대신, **판정 근거를 구조화된 �
 - **위키 점검(lint)**: 모순·오래된 내용·고아 페이지 주기적으로 찾아서 사용자에게 확인 요청
 - **사용자는 본문을 직접 고치지 않고 댓글처럼 주석을 단다** ("여기 이렇게 해야 한대") → 주석을 모아 **Claude에게 한 번에 반영 요청**
   → Claude가 고친 새 버전(revision) → 줄 단위 diff → **Claude가 위키 전체를 읽고 모순 검토** → 모순 없으면 자동 반영 / 있으면 사용자 확인(그래도 반영·취소)
-  - 검토기는 Decision model처럼 인터페이스(`WikiReviewer`)로 분리 — 목업은 규칙 기반, 실제는 Claude
+  - 검토기는 인터페이스(`WikiReviewer`)로 분리 — 운영은 Claude(`src/server/ai/wikiReview.ts`), API 키가 없으면 규칙 목업
   - 페이지별 변경 이력(버전·시각·작성자 나/Claude·상태·diff), 위키 홈에 '확인 대기' 목록
 
 ### F3. 질문 → 판정 → 답/알아올 것 파이프라인
@@ -183,7 +184,7 @@ wiki_links     페이지 간 링크
 wiki_citations 페이지 ↔ 원본 근거 매핑
 wiki_revisions 변경 요청 (page_id, base_version, title/summary/body 변경분, author: user|claude, status: pending_review|needs_confirm|applied|cancelled, review_result json, created_at)
 review_items   망각곡선 복습 상태 (다음 복습일, 간격, 난이도)
-questions      질문 + 판정 결과(신호 점수, 결론, 이유)
+questions      질문 + Claude 판단 결과(결론, 이유)
 info_requests  "알아올 것" (대상: 상사/문서, 상태, 받아온 답)
 items          항목 (kind: event|task, start/end/allDay, due, priority, status, from, waiting_for, brief)
 sub_items      하위 항목 (item_id, title, done, sort)
@@ -236,7 +237,7 @@ cautions       주의할 점 (point, wrong, by_role, source, next_review, interv
 |---|---|---|
 | 사용자 범위 | **나 혼자 (1인용)** | 멀티테넌시·권한 체계 없음. 단, 테이블엔 `user_id` 두어 확장 여지만 남김 |
 | 사내 문서 외부 전송 | **허용** | Claude API 바로 사용. 마스킹 단계 불필요 |
-| Decision model | **모델 비종속 인터페이스로 추상화** (입출력 고정) | 아래 8-1 참고. 구현체 교체 가능 (LLM 점수+규칙 → 추후 학습 모델 등) |
+| ~~Decision model~~ | **제외 (2026-11-01)** | Claude가 근거를 읽고 직접 판단. 메모 정리·위키 편집·모순 검토도 Claude API (`src/server/ai/`) |
 | 캘린더 | **앱 내부만** | 외부 동기화 없음 |
 | Claude Desktop 연동 | **원격 MCP 서버** | `/api/mcp` 공개 HTTPS + OAuth 필요 → 공개 도메인 필수 |
 | 결과물 회수 | ~~submit_draft 제출~~ → **Claude Desktop 채팅 출력으로 확인** (1차 QA 변경) | 앱엔 퀘스트별 작업 지침만 저장 |
@@ -245,43 +246,6 @@ cautions       주의할 점 (point, wrong, by_role, source, next_review, interv
 | 도메인 | `maekr.cloud` (Cloudflare) 서브도메인 — **나중에 결정** | Tailscale만 쓰면 Claude Desktop 원격 MCP가 접근 불가 → MCP 단계(P6) 전엔 공개 도메인 필요 |
 | 브리핑 시간 | **앱에서 설정** | 사용자 설정 테이블 + 스케줄러가 매 분/5분마다 "보낼 시간 된 브리핑" 확인 |
 | 로그인 | **Passkey** (WebAuthn) | HTTPS + 고정 도메인 필요 (RP ID). 로컬 개발은 localhost로 가능 |
-
-### 8-1. Decision Model 인터페이스 (초안)
-
-```ts
-// 입력: 질문 + 수집된 근거 + 맥락
-interface DecisionInput {
-  question: string;
-  evidence: Array<{
-    sourceId: string;
-    excerpt: string;
-    sourceType: "manual" | "guideline" | "boss_answer" | "peer_advice" | "note";
-    updatedAt: string;
-  }>;
-  context?: { relatedQuestId?: string; userProfile?: Record<string, unknown> };
-}
-
-// 출력: 판정 + 이유 + (필요 시) 알아올 것
-interface DecisionOutput {
-  verdict: "ANSWER" | "ANSWER_WITH_CAVEAT" | "NEED_INFO";
-  confidence: number;            // 0~1
-  signals: Record<string, number>; // 커버리지, 충돌, 신선도, 위험도, 모호성 등 (구현체별 자유)
-  rationale: string;             // 사용자에게 보여줄 판단 이유
-  missing?: Array<{
-    kind: "ask_person" | "find_document" | "clarify_question";
-    target?: string;             // 예: "팀장님", "보안 가이드라인 최신본"
-    what: string;                // 무엇을 알아와야 하는지
-    suggestedScript?: string;    // 상사에게 물을 때 쓸 문장
-  }>;
-}
-
-interface DecisionModel {
-  id: string;
-  decide(input: DecisionInput): Promise<DecisionOutput>;
-}
-```
-- 첫 구현체: `LlmSignalRuleModel` (LLM이 signals 추출 → 규칙으로 verdict 결정)
-- 모든 판정과 이후 피드백을 저장 → 나중에 구현체 교체·비교(A/B) 가능
 
 ### 8-2. oci-prod 서버 현황
 - **ARM64 (aarch64)**, 2코어, RAM 7.7GB, 디스크 48GB(여유 35GB), Ubuntu 26.04

@@ -81,7 +81,7 @@ export async function deleteComment(id: string) {
   await wiki.deleteComment(getDb(), v.Id.parse(id));
 }
 
-/** 열린 주석을 Claude(지금은 규칙 편집기)에게 넘겨 새 버전을 만든다 */
+/** 열린 주석을 Claude에게 넘겨 새 버전을 만든다 (API 키가 없으면 패턴 편집기) */
 export async function requestClaudeEdit(slug: string) {
   await requireUser();
   const db = getDb();

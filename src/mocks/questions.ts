@@ -7,7 +7,6 @@ export const questions: QuestionRecord[] = [
     question: "팀 회식 때 법인카드로 결제하면 계정과목을 뭘로 해야 해?",
     verdict: "ANSWER",
     confidence: 0.92,
-    signals: { coverage: 0.95, conflict: 0.05, freshness: 0.9, risk: 0.3, ambiguity: 0.1 },
     rationale:
       "ERP 경비 가이드에 '팀 내부 식사 = 회의비'가 명시돼 있고, 법인카드 규정(2026)과도 충돌이 없어요. 금액이 크지 않으면 되돌리기 쉬운 작업이라 확답했어요.",
     answer:
@@ -19,7 +18,7 @@ export const questions: QuestionRecord[] = [
     missing: [],
     status: "resolved",
     feedback: "up",
-    modelId: "llm-signal-rule@v1",
+    modelId: "claude-opus-5-5",
   },
   {
     id: "a2",
@@ -27,7 +26,6 @@ export const questions: QuestionRecord[] = [
     question: "한빛물산 미팅 자료에 우리 제품 단가표를 넣어도 돼?",
     verdict: "NEED_INFO",
     confidence: 0.31,
-    signals: { coverage: 0.35, conflict: 0.2, freshness: 0.8, risk: 0.9, ambiguity: 0.4 },
     rationale:
       "대외비 문서 반출 규정은 있지만 '단가표'가 대외비인지 위키에 근거가 없어요. 외부로 나가는 자료라 틀리면 되돌리기 어려워서(위험도 높음) 확답하지 않았어요.",
     citations: [
@@ -50,7 +48,7 @@ export const questions: QuestionRecord[] = [
     ],
     status: "open",
     itemId: "i1",
-    modelId: "llm-signal-rule@v1",
+    modelId: "claude-opus-5-5",
   },
   {
     id: "a3",
@@ -58,7 +56,6 @@ export const questions: QuestionRecord[] = [
     question: "주간보고에 아직 안 끝난 PPT 작업은 어떻게 써?",
     verdict: "ANSWER_WITH_CAVEAT",
     confidence: 0.7,
-    signals: { coverage: 0.75, conflict: 0.1, freshness: 0.85, risk: 0.2, ambiguity: 0.3 },
     rationale:
       "주간보고 양식과 팀장님 원칙(결론부터)으로 형식은 답할 수 있어요. 다만 진행 중 업무를 진척률로 쓸지 단계로 쓸지 팀장님 선호는 아직 기록이 없어서 주의사항을 붙였어요.",
     answer:
@@ -76,7 +73,7 @@ export const questions: QuestionRecord[] = [
       },
     ],
     status: "resolved",
-    modelId: "llm-signal-rule@v1",
+    modelId: "claude-opus-5-5",
   },
   {
     id: "a4",
@@ -84,7 +81,6 @@ export const questions: QuestionRecord[] = [
     question: "출장 갈 때 KTX 특실 타도 돼?",
     verdict: "NEED_INFO",
     confidence: 0.18,
-    signals: { coverage: 0.1, conflict: 0, freshness: 0, risk: 0.5, ambiguity: 0.2 },
     rationale: "출장비 규정 문서가 위키에 아예 없어요. 근거 없이 답하면 추측이라 확답하지 않았어요.",
     citations: [],
     missing: [
@@ -96,7 +92,7 @@ export const questions: QuestionRecord[] = [
     ],
     status: "open",
     itemId: "i11",
-    modelId: "llm-signal-rule@v1",
+    modelId: "claude-opus-5-5",
   },
   {
     id: "a5",
@@ -104,7 +100,6 @@ export const questions: QuestionRecord[] = [
     question: "접대비 쓸 때 참석자 명단에 직급까지 써야 해?",
     verdict: "NEED_INFO",
     confidence: 0.4,
-    signals: { coverage: 0.5, conflict: 0.6, freshness: 0.5, risk: 0.4, ambiguity: 0.1 },
     rationale: "2024 규정과 2026 개정판의 기재 항목이 달라서(근거 충돌) 확답하지 않았어요.",
     citations: [{ wikiSlug: "corporate-card", excerpt: "참석자(회사명/이름/직급) 명단 필수" }],
     missing: [
@@ -118,7 +113,7 @@ export const questions: QuestionRecord[] = [
       },
     ],
     status: "resolved",
-    modelId: "llm-signal-rule@v1",
+    modelId: "claude-opus-5-5",
   },
   {
     id: "a6",
@@ -126,13 +121,12 @@ export const questions: QuestionRecord[] = [
     question: "외부 손님 미팅 회의실은 어디로 잡아?",
     verdict: "ANSWER",
     confidence: 0.95,
-    signals: { coverage: 1, conflict: 0, freshness: 0.95, risk: 0.1, ambiguity: 0.05 },
     rationale: "매뉴얼에 명시돼 있고 충돌 없음. 위험도 낮음.",
     answer: "외부 손님은 **5층 대회의실**, 하루 전까지 예약하고 1층 안내데스크에 방문자 등록도 하세요.",
     citations: [{ wikiSlug: "meeting-room", excerpt: "외부 손님: 5층 대회의실" }],
     missing: [],
     status: "resolved",
     feedback: "up",
-    modelId: "llm-signal-rule@v1",
+    modelId: "claude-opus-5-5",
   },
 ];

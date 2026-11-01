@@ -6,8 +6,11 @@ import type { Conflict, EditNote, PageContent, Revision, WikiComment } from "@/l
 import type { WikiData } from "@/lib/workspace";
 import { nextInterval } from "@/lib/review";
 import { seoulNow, seoulToday } from "@/lib/today";
-import { wikiReviewer, type WikiReviewer } from "@/lib/wikiReview";
-import { wikiEditor, type WikiEditor } from "@/lib/wikiEditor";
+import type { ReviewSource, WikiReviewer } from "@/lib/wikiReview";
+import type { WikiEditor } from "@/lib/wikiEditor";
+import { defaultReviewer } from "@/server/ai/wikiReview";
+import { defaultEditor } from "@/server/ai/wikiEdit";
+import { getObjectBytes } from "@/server/storage";
 import { sources, wikiComments, wikiLinks, wikiPages, wikiPageSources, wikiRevisions } from "@/server/db/schema";
 import { dOut, dtIn, dtOut, opt } from "@/server/db/convert";
 import type { Db, Exec } from "@/server/db/types";
@@ -192,14 +195,55 @@ const STALE: Conflict = {
   reason: "이 변경을 만든 뒤 다른 변경이 먼저 반영됐어요. 덮어쓰지 않도록 취소하고 다시 고쳐 주세요.",
 };
 
+/** 검토에 넘길 원본 문서 한도 — 이보다 크면 제목만 넘긴다 (요청 한 번 32MB 제한) */
+const REVIEW_PDF_BYTES = 15 * 1024 * 1024;
+const REVIEW_IMAGE_BYTES = 5 * 1024 * 1024;
+const REVIEW_TEXT_CHARS = 200_000;
+
+/** 페이지에 붙은 원본 문서를 Claude가 읽을 수 있는 형태로 (docx·hwp 등은 제목만) */
+async function reviewSources(db: Exec, slug: string): Promise<ReviewSource[]> {
+  const rows = await db
+    .select({ title: sources.title, objectKey: sources.objectKey, fileType: sources.fileType, sizeBytes: sources.sizeBytes })
+    .from(wikiPageSources)
+    .innerJoin(sources, eq(sources.id, wikiPageSources.sourceId))
+    .where(eq(wikiPageSources.slug, slug))
+    .orderBy(asc(wikiPageSources.sort));
+  return Promise.all(
+    rows.map(async (s): Promise<ReviewSource> => {
+      const ext = s.objectKey?.split(".").pop()?.toLowerCase();
+      const size = s.sizeBytes ?? Infinity;
+      const readable =
+        s.objectKey &&
+        ((s.fileType === "text" && size <= REVIEW_TEXT_CHARS * 4) ||
+          (s.fileType === "pdf" && size <= REVIEW_PDF_BYTES) ||
+          (s.fileType === "image" && size <= REVIEW_IMAGE_BYTES));
+      if (!readable) return { title: s.title };
+      try {
+        const bytes = await getObjectBytes(s.objectKey!);
+        if (s.fileType === "text") {
+          const text = new TextDecoder().decode(bytes);
+          return text.length <= REVIEW_TEXT_CHARS ? { title: s.title, content: { kind: "text", text } } : { title: s.title };
+        }
+        const base64 = Buffer.from(bytes).toString("base64");
+        if (s.fileType === "pdf") return { title: s.title, content: { kind: "pdf", base64 } };
+        return { title: s.title, content: { kind: "image", mediaType: ext === "png" ? "image/png" : "image/jpeg", base64 } };
+      } catch (error) {
+        console.error("[wiki] 원본 문서를 읽지 못함", s.objectKey, error);
+        return { title: s.title };
+      }
+    }),
+  );
+}
+
 /** 검토 실행: 모순 없으면 바로 반영, 있으면 확인 대기 */
-export async function runReview(db: Db, id: string, reviewer: WikiReviewer = wikiReviewer) {
+export async function runReview(db: Db, id: string, reviewer: WikiReviewer = defaultReviewer()) {
   const r = await getRevision(db, id);
   if (!r || r.status !== "reviewing") return;
   let conflicts: Conflict[];
   try {
     const pages = (await allContents(db)).map((p) => (p.slug === r.slug ? { slug: p.slug, ...r.after } : p));
-    conflicts = (await reviewer.review({ slug: r.slug, before: r.before, after: r.after }, pages)).conflicts;
+    const docs = await reviewSources(db, r.slug);
+    conflicts = (await reviewer.review({ slug: r.slug, before: r.before, after: r.after }, pages, docs)).conflicts;
   } catch (error) {
     console.error("[wiki] 검토 실패", id, error);
     conflicts = [REVIEW_FAILED];
@@ -296,7 +340,7 @@ export async function deleteComment(db: Exec, id: string) {
  * 열린 주석을 한 번에 편집기(Claude)에게 넘김 → 고친 새 버전(작성자 Claude) → 모순 검토.
  * 바뀐 게 없으면 버전을 만들지 않고 주석에 메모만 남긴다.
  */
-export async function requestClaudeEdit(db: Db, slug: string, editor: WikiEditor = wikiEditor): Promise<Revision | null> {
+export async function requestClaudeEdit(db: Db, slug: string, editor: WikiEditor = defaultEditor()): Promise<Revision | null> {
   const rows = await db
     .select()
     .from(wikiComments)
@@ -307,7 +351,19 @@ export async function requestClaudeEdit(db: Db, slug: string, editor: WikiEditor
   const before = await pageContent(db, slug);
   if (!before) throw new WikiError(`없는 위키 페이지: ${slug}`);
 
-  const { content, edits } = await editor.apply(before, comments, await titleResolver(db));
+  let result: Awaited<ReturnType<WikiEditor["apply"]>>;
+  try {
+    result = await editor.apply(before, comments, await titleResolver(db));
+  } catch (error) {
+    // 편집 실패 — 주석은 열린 채로 두고 이유만 남긴다 (다시 요청 가능)
+    console.error("[wiki] Claude 편집 실패", slug, error);
+    await db
+      .update(wikiComments)
+      .set({ note: "Claude가 반영하지 못했어요. 잠시 뒤 다시 요청해 주세요." })
+      .where(inArray(wikiComments.id, comments.map((c) => c.id)));
+    return null;
+  }
+  const { content, edits } = result;
   const changed = content.body !== before.body || content.title !== before.title || content.summary !== before.summary;
   const ok = edits.filter((e) => e.applied);
   const failed = changed && ok.length > 0 ? edits.filter((e) => !e.applied) : edits;

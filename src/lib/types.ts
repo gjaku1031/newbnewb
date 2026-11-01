@@ -136,15 +136,9 @@ export interface QuestionRecord {
   askedAt: string;
   question: string;
   verdict: Verdict;
+  /** Claude가 스스로 매긴 확신도 0~1 */
   confidence: number;
-  /** 0~1 정규화된 판정 신호 */
-  signals: {
-    coverage: number;
-    conflict: number;
-    freshness: number;
-    risk: number;
-    ambiguity: number;
-  };
+  /** 왜 이렇게 답했는지 (Claude 설명) */
   rationale: string;
   answer?: string;
   citations: { wikiSlug: string; excerpt: string }[];

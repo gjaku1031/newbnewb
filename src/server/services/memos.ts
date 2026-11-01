@@ -3,7 +3,8 @@ import { and, desc, eq, inArray, lt, sql } from "drizzle-orm";
 import type { Item } from "@/lib/types";
 import type { Memo, MemoAction } from "@/lib/memoTypes";
 import { fmt } from "@/lib/date";
-import { memoProcessor, type MemoPlan, type MemoProcessor } from "@/lib/memoProcessor";
+import type { MemoPlan, MemoProcessor } from "@/lib/memoProcessor";
+import { defaultMemoProcessor } from "@/server/ai/memo";
 import { seoulNow, seoulToday } from "@/lib/today";
 import { memos, wikiPages } from "@/server/db/schema";
 import { dtIn, dtOut, opt } from "@/server/db/convert";
@@ -31,17 +32,18 @@ export async function deleteMemo(db: Exec, id: string) {
 const day = (d: string) => fmt(d, "M/d (EEE)");
 
 /**
- * 메모 처리: 처리기(지금은 규칙, 나중엔 Claude)가 만든 계획을 항목·위키에 반영하고 한 일을 기록.
+ * 메모 처리: 처리기(Claude, 키가 없으면 규칙 목업)가 만든 계획을 항목·위키에 반영하고 한 일을 기록.
  * 위키 갱신은 변경 요청으로 만들고, 커밋 뒤 검토를 돌린다.
  */
-export async function processMemo(db: Db, id: string, processor: MemoProcessor = memoProcessor) {
+export async function processMemo(db: Db, id: string, processor: MemoProcessor = defaultMemoProcessor()) {
   const [memo] = await db.select().from(memos).where(eq(memos.id, id));
   if (!memo || memo.status !== "processing") return;
   const today = seoulToday();
 
   let revisionIds: string[];
   try {
-    const plan = await processor.process(memo.text, today);
+    const pages = await db.select({ slug: wikiPages.slug, title: wikiPages.title, summary: wikiPages.summary }).from(wikiPages);
+    const plan = await processor.process(memo.text, today, pages);
     revisionIds = await db.transaction(async (tx) => {
       // 메모 행을 잠그고 다시 확인 — 같은 메모를 다른 요청이 먼저 처리했으면 아무것도 만들지 않는다
       const [cur] = await tx.select({ status: memos.status }).from(memos).where(eq(memos.id, id)).for("update");

@@ -2,8 +2,8 @@ import type { EditNote, PageContent, WikiComment } from "@/lib/wikiTypes";
 import { plainLine, type TitleOf } from "@/lib/markdownText";
 
 /**
- * 주석대로 문서를 고치는 편집기 — 인터페이스로 분리.
- * 실제 서비스에선 Claude가 주석을 읽고 문서를 고친다.
+ * 주석대로 문서를 고치는 편집기 인터페이스. 운영에선 Claude(src/server/ai/wikiEdit.ts)가 주석을 읽고 문서를 고친다.
+ * API 키가 없으면 아래 패턴 목업.
  */
 export interface WikiEditor {
   id: string;
@@ -118,6 +118,3 @@ export class PatternEditor implements WikiEditor {
     return { content: { ...content, body: lines.join("\n") }, edits };
   }
 }
-
-/** 지금 쓰는 편집기 (구현체 교체 지점) */
-export const wikiEditor: WikiEditor = new PatternEditor();

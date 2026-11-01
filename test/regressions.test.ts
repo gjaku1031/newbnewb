@@ -1,8 +1,9 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import type { MemoProcessor } from "@/lib/memoProcessor";
-import { memoProcessor } from "@/lib/memoProcessor";
+import { RuleMemoProcessor } from "@/lib/memoProcessor";
 import type { WikiReviewer } from "@/lib/wikiReview";
+import type { WikiEditor } from "@/lib/wikiEditor";
 import { seedDemo } from "@/server/seed";
 import { memos, wikiRevisions } from "@/server/db/schema";
 import * as items from "@/server/services/items";
@@ -37,12 +38,12 @@ describe("메모 처리 — 중복·실패", () => {
   it("같은 메모를 동시에 두 번 처리해도 항목은 한 번만 생긴다", async () => {
     await memosService.addMemo(db, { id: "dup1", text: "내일 3시 거래처 미팅" });
     const before = (await items.listItems(db)).length;
-    // 처리기가 느린 상황(나중의 Claude)에서 두 요청이 겹치는 경우
+    // 처리기가 느린 상황(Claude 호출)에서 두 요청이 겹치는 경우
     const slow: MemoProcessor = {
       id: "slow",
       process: async (text, today) => {
         await new Promise((r) => setTimeout(r, 200));
-        return memoProcessor.process(text, today);
+        return new RuleMemoProcessor().process(text, today);
       },
     };
     await Promise.all([memosService.processMemo(db, "dup1", slow), memosService.processMemo(db, "dup1", slow)]);
@@ -148,6 +149,36 @@ describe("위키 변경 — 덮어쓰기·버전", () => {
     await wiki.runReview(db, r.id, oneConflict);
     expect(await wiki.applyRevision(db, r.id)).toBe(true);
     expect((await content()).summary).toBe("모순");
+  });
+
+  it("Claude 편집이 실패하면 버전을 만들지 않고 주석은 열린 채 이유만 남긴다", async () => {
+    await wiki.addComment(db, { id: "cf1", slug, anchor: null, text: "17:00 → 16:00" });
+    const failing: WikiEditor = {
+      id: "fail",
+      apply: async () => {
+        throw new Error("API 장애");
+      },
+    };
+    const before = await content();
+    expect(await wiki.requestClaudeEdit(db, slug, failing)).toBeNull();
+    expect(await content()).toEqual(before);
+    const c = (await wiki.listWiki(db)).comments.find((x) => x.id === "cf1")!;
+    expect(c.status).toBe("open");
+    expect(c.note).toContain("다시 요청");
+  });
+
+  it("메모 처리기에 위키 페이지 목록을 넘긴다", async () => {
+    await memosService.addMemo(db, { id: "pg1", text: "메모" });
+    let seen: string[] = [];
+    const spy: MemoProcessor = {
+      id: "spy",
+      process: async (text, today, pages) => {
+        seen = pages.map((p) => p.slug);
+        return { cleaned: text, events: [], tasks: [], asks: [], wiki: [], cautions: [] };
+      },
+    };
+    await memosService.processMemo(db, "pg1", spy);
+    expect(seen).toContain(slug);
   });
 });
 

@@ -5,7 +5,7 @@ import { SettingsSection } from "./Section";
 const MCP_URL = "https://newb.maekr.cloud/api/mcp";
 
 const TOOLS = [
-  { name: "ask_newb", desc: "질문 판정" },
+  { name: "ask_newb", desc: "질문 근거 찾기·기록" },
   { name: "get_task_brief", desc: "할 일 작업 지침" },
   { name: "get_guidelines", desc: "가이드라인 검색" },
   { name: "add_to_wiki", desc: "위키에 추가" },

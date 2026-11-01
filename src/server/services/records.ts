@@ -17,7 +17,6 @@ function toQuestion(q: typeof questions.$inferSelect): QuestionRecord {
     question: q.question,
     verdict: q.verdict,
     confidence: q.confidence,
-    signals: q.signals,
     rationale: q.rationale,
     answer: opt(q.answer),
     citations: q.citations,
