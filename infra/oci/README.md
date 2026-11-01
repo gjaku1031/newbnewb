@@ -86,7 +86,7 @@ oci-prod: newb-deploy.timer ─▶ deploy.sh: 받기 → 마이그레이션 → 
 ```
 
 - GitHub에서 서버로 들어오는 접속이 없습니다. 서버가 새 이미지를 **가져갑니다** (SSH 키·Tailscale 키를 GitHub에 두지 않음).
-- 컨테이너는 `127.0.0.1:18090`에만 열려 있습니다 (외부 공개 전). 이미지는 digest로 고정해 `/srv/newb/deploy/current`에 기록합니다.
+- 외부 접속은 Caddy(`newb.maekr.cloud`)를 거치고, 서버 안 확인용으로 `127.0.0.1:18090`도 열려 있습니다. 이미지는 digest로 고정해 `/srv/newb/deploy/current`에 기록합니다.
 - 기록: `/srv/newb/deploy/history.log`, 타이머 로그: `journalctl -u newb-deploy`
 
 | 파일 | 위치 | 역할 |
@@ -104,21 +104,26 @@ bash infra/oci/deploy/install.sh
 되돌리기: `history.log`에서 이전 이미지를 골라 `ssh oci-prod /srv/newb/deploy/deploy.sh <이미지>`.
 타이머가 다음 main 이미지에서 다시 앞으로 가므로, 오래 멈추려면 `sudo systemctl stop newb-deploy.timer`.
 
-### 외부 공개 (아직 안 함) — ken-blog의 Caddy 재사용
+### 외부 공개 — ken-blog의 Caddy 재사용 (2026-11-01 연결)
 
-oci-prod의 80/443은 ken-blog 스택의 Caddy(`ken-blog-caddy-1`, 설정 `/srv/ken-blog-live/deploy/Caddyfile`)가 받고 있습니다. 새 Caddy 없이 여기에 붙입니다.
+`https://newb.maekr.cloud` — oci-prod의 80/443은 ken-blog 스택의 Caddy(`ken-blog-caddy-1`, 설정 `/srv/ken-blog-live/deploy/Caddyfile`)가 받고 있어 새 Caddy 없이 여기에 붙였습니다.
 
-1. ✅ Cloudflare DNS: `newb.maekr.cloud` A → `158.101.158.194` (**DNS only**, Caddy가 Let's Encrypt 인증서 발급) — 2026-11-01 생성.
-   토큰은 이 컴퓨터의 `~/.config/cloudflare/env`(`CF_API_TOKEN`)에 있고, 레코드는 Cloudflare API로 만들었습니다. Caddy 블록이 없는 동안엔 연결 단계에서 끊겨 아무것도 열리지 않습니다.
-2. newb 컨테이너를 Caddy 네트워크(`ken-blog_default`, external)에 별칭 `newb`로 연결
-3. Caddyfile에 사이트 블록 추가 후 무중단 리로드 — 파일은 bind mount라 **같은 파일에 덮어써야** 함(`sed -i`처럼 새 파일로 바꾸면 컨테이너가 옛 파일을 봄)
+1. Cloudflare DNS: `newb.maekr.cloud` A → `158.101.158.194` (**DNS only**, 인증서는 Caddy가 Let's Encrypt에서 발급·갱신).
+   토큰은 이 컴퓨터의 `~/.config/cloudflare/env`(`CF_API_TOKEN`), 레코드는 Cloudflare API로 만듦.
+2. newb 컨테이너는 Caddy 네트워크(`ken-blog_default`, external)에 별칭 `newb`로 붙음 — `deploy/compose.yaml`의 `networks`.
+3. Caddyfile 맨 끝의 newb 블록 (백업: `Caddyfile.bak-20261101T055047Z-before-newb`):
    ```
    newb.maekr.cloud {
+   	encode zstd gzip
    	reverse_proxy newb:3000
    }
    ```
-   `docker exec ken-blog-caddy-1 caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile`
-4. Passkey 로그인을 붙인 뒤에 공개 (지금 운영 빌드는 항상 비로그인이라 데이터는 나가지 않음)
+   - ken-blog의 Caddyfile은 **자동 배포 대상이 아니라 서버에서 직접 관리**합니다(ken-blog `deploy/API-RELEASE.md`). ken-blog 저장소의 Caddyfile로 서버 파일을 덮어쓰면 이 블록이 사라지니, 그때 다시 붙여야 합니다.
+   - 고칠 때: 파일은 bind mount라 **같은 파일에 써야** 함(`sed -i`처럼 새 파일로 바꾸면 컨테이너가 옛 파일을 봄) → 검증 → 무중단 리로드
+     `docker exec ken-blog-caddy-1 caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile`
+     `docker exec ken-blog-caddy-1 caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile`
+   - 내리기: 블록을 지우고 리로드 (newb 컨테이너는 그대로 둬도 외부에서 안 보임).
+4. 운영 빌드는 Passkey 로그인 전까지 **항상 비로그인**이라 "로그인이 필요해요" 화면만 나오고 데이터는 나가지 않습니다(`/api/workspace` 401).
 
 ## 2026-10-30 공용 MySQL 재생성 기록
 

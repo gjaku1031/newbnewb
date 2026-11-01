@@ -86,7 +86,8 @@
 - Drizzle ORM + mysql2, zod(서버 액션 입력 검증), Docker(Next.js standalone)
 - 파일 저장: 운영은 OCI SDK(서버 인증, 비밀키 없음), 로컬은 AWS S3 SDK(RustFS)
 - 테스트: Vitest + Testcontainers(MySQL), Playwright e2e
-- 예정: Passkey(WebAuthn), MCP 서버(`/api/mcp`), oci-prod 배포(arm64 + Caddy)
+- 운영: oci-prod(arm64) + ken-blog의 Caddy → `https://newb.maekr.cloud`
+- 예정: Passkey(WebAuthn), MCP 서버(`/api/mcp`)
 
 ## 시작하기
 
@@ -208,8 +209,8 @@ docs/PLAN.md               기획·결정 기록
 - [ ] MCP 서버 + Claude Desktop 커스텀 커넥터 (`ask_newb`, `get_task_brief`, `get_guidelines`, `add_to_wiki`)
 - [x] 메모 처리기·위키 편집기·위키 검토기를 Claude API로 교체 (별도 판정 모델은 빼고 Claude가 직접 판단)
 - [ ] iPhone·iPad Safari 최적화, PWA·푸시 알림
-- [x] CI/CD: GitHub Actions(검사·e2e·arm64 이미지) → oci-prod 자동 배포 (서버 내부 `127.0.0.1:18090`)
+- [x] CI/CD: GitHub Actions(검사·e2e·arm64 이미지) → oci-prod 자동 배포
 - [x] `newb.maekr.cloud` DNS 레코드 (Cloudflare, DNS only → oci-prod)
-- [ ] 외부 공개: ken-blog Caddy에 사이트 블록 (Passkey 뒤)
+- [x] 외부 공개: `https://newb.maekr.cloud` (ken-blog Caddy에 사이트 블록, 로그인 전이라 데이터는 안 나감)
 
 자세한 기획과 결정 사항은 [docs/PLAN.md](docs/PLAN.md)에 있습니다.

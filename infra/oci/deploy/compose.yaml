@@ -20,7 +20,12 @@ services:
       - path: /srv/newb/anthropic.env
         required: false
         format: raw
-    # 아직 외부 공개 전: 서버 안에서만 접속 (도메인·Caddy·Passkey를 붙일 때 연다)
+    # 외부 접속은 ken-blog의 Caddy가 newb.maekr.cloud → newb:3000 으로 넘긴다 (infra/oci/README.md)
+    networks:
+      default: {}
+      caddy:
+        aliases: [newb]
+    # 서버 안에서 직접 확인할 때만 (외부에 열지 않음)
     ports:
       - "127.0.0.1:18090:3000"
     healthcheck:
@@ -37,3 +42,9 @@ services:
       options:
         max-size: 10m
         max-file: "3"
+
+networks:
+  # ken-blog 스택이 만든 Caddy 네트워크 (newb가 만들거나 지우지 않음)
+  caddy:
+    name: ken-blog_default
+    external: true
