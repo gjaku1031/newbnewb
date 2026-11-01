@@ -263,7 +263,7 @@ cautions       주의할 점 (point, wrong, by_role, source, next_review, interv
 - **로그인한 사용자에게만** 툴바 표시, 주석은 같은 주소의 `/api/agentation/*` 프록시로 보내고 서버에서 다시 로그인 확인 → 주석 서버(4747)는 외부에 직접 노출하지 않음
 - 모든 기기(Windows·Mac·iPhone·iPad)에서 동일하게 동작
 - 환경변수 `AGENTATION_URL` (기본 `http://localhost:4747`). oci-prod 배포 시 Claude Code가 도는 oci-dev 주소(Tailscale)로 지정
-- 현재 로그인은 임시(`src/lib/auth.ts`): 개발 모드 = 로그인됨, 프로덕션 = 비로그인. Passkey 붙이면 교체
+- 로그인: Passkey (2026-11-01). 첫 등록은 서버 CLI로 만든 1회용 초대 링크, 세션은 해시로 DB 저장, `next dev`만 자동 로그인 (`NEWB_DEV_LOGIN=off`로 끔)
 
 ### 8-4. 남은 열린 질문
 - hwp 작성 방식 최종 결정

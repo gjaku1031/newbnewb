@@ -8,7 +8,7 @@
 
 > **현재 단계: 백엔드 연결**
 > 모든 화면이 MySQL·Object Storage에 저장됩니다. 메모 정리·위키 주석 반영·위키 모순 검토는 **Claude API**가 처리합니다
-> (`ANTHROPIC_API_KEY`가 없으면 규칙 기반 목업). 로그인(Passkey)과 Claude Desktop 연동(MCP)은 아직입니다. → [로드맵](#로드맵)
+> (`ANTHROPIC_API_KEY`가 없으면 규칙 기반 목업). Claude Desktop 연동(MCP)은 아직입니다. → [로드맵](#로드맵)
 
 ---
 
@@ -87,7 +87,8 @@
 - 파일 저장: 운영은 OCI SDK(서버 인증, 비밀키 없음), 로컬은 AWS S3 SDK(RustFS)
 - 테스트: Vitest + Testcontainers(MySQL), Playwright e2e
 - 운영: oci-prod(arm64) + ken-blog의 Caddy → `https://newb.maekr.cloud`
-- 예정: Passkey(WebAuthn), MCP 서버(`/api/mcp`)
+- 로그인: Passkey(WebAuthn, SimpleWebAuthn) — 1인용, 첫 등록은 서버에서 만든 1회용 초대 링크로
+- 예정: MCP 서버(`/api/mcp`)
 
 ## 시작하기
 
@@ -128,7 +129,10 @@ npm run dev          # http://localhost:3000
 원본 파일   POST /api/sources → Object Storage + sources 테이블, GET /api/sources/{id}/file로 내려받기
 ```
 
-- 로그인은 아직 임시(`src/lib/auth.ts`): `next dev`는 로그인된 상태, 운영 빌드는 항상 비로그인이라 **데이터가 하나도 나가지 않습니다** (Passkey 붙이면 교체).
+- 로그인: Passkey 세션 쿠키(HttpOnly, 운영은 `__Host-` + Secure, 30일) → DB `auth_sessions`(해시만 저장)로 확인 (`src/lib/auth.ts`, `src/server/services/auth.ts`).
+  - 첫 Passkey는 서버에서 만든 1회용 초대 링크로만 등록합니다(공개 주소라 아무나 먼저 등록하지 못하게). 그 뒤 기기 추가·삭제·로그아웃은 설정에서.
+  - `next dev`는 기본으로 로그인된 상태입니다. 실제 로그인을 보려면 `.env.local`에 `NEWB_DEV_LOGIN=off`, `APP_ORIGIN=http://localhost:3000`을 넣고 `npm run auth:invite`로 링크를 만듭니다(Passkey는 https나 localhost에서만 동작).
+  - e2e는 실제 Passkey 로그인으로 돕니다 — Chrome 가상 인증기로 등록해 그 세션을 모든 테스트가 씁니다.
 - "오늘"은 한국 시간 기준이며, 서버가 스냅샷에 담아 보낸 시각으로 맞춥니다 (`src/lib/today.ts`).
 - 사람 이름·내부 메모·자료 제공자는 DB에만 있고 화면으로 보내지 않습니다 (Claude 답변용).
 
@@ -205,7 +209,7 @@ docs/PLAN.md               기획·결정 기록
 - [x] QA 반영: 항목 통합 모델, 캘린더/데이터베이스 보기, 위키 주석 반영 흐름, 빠른 메모
 - [x] 인프라: 로컬 Docker(MySQL·S3), Drizzle 마이그레이션, 앱 이미지
 - [x] 백엔드: MySQL 스키마, 서버 액션·Route Handlers, 서버 저장, 원본 업로드(Object Storage)
-- [ ] Passkey 로그인 (1인용)
+- [x] Passkey 로그인 (1인용, 초대 링크로 첫 등록, 설정에서 기기 추가·삭제·로그아웃)
 - [ ] MCP 서버 + Claude Desktop 커스텀 커넥터 (`ask_newb`, `get_task_brief`, `get_guidelines`, `add_to_wiki`)
 - [x] 메모 처리기·위키 편집기·위키 검토기를 Claude API로 교체 (별도 판정 모델은 빼고 Claude가 직접 판단)
 - [ ] iPhone·iPad Safari 최적화, PWA·푸시 알림

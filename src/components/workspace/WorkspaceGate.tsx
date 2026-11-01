@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { connection } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
+import { SignedOut } from "@/components/auth/SignedOut";
 import { getDb } from "@/server/db/client";
 import { loadWorkspace } from "@/server/services/workspace";
 import { AppShell } from "@/components/shell/AppShell";
@@ -26,16 +27,5 @@ export async function WorkspaceGate({ children }: { children: React.ReactNode })
       </Suspense>
       <QuickMemo />
     </WorkspaceProvider>
-  );
-}
-
-function SignedOut() {
-  return (
-    <main className="grid min-h-dvh place-items-center px-6">
-      <div className="max-w-[360px] text-center">
-        <div className="text-[20px] font-bold tracking-[-0.02em]">newb</div>
-        <p className="mt-3 text-[14px] text-muted">로그인이 필요해요.</p>
-      </div>
-    </main>
   );
 }

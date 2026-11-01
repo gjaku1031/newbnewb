@@ -76,16 +76,19 @@ test("지원하지 않는 형식·깨진 본문·너무 큰 요청은 거절한�
   });
   expect(broken.status()).toBe(400);
 
-  // 200MB라고 알리고 본문은 보내지 않는다 → 본문을 읽기 전에 413
-  expect(await statusOfDeclaredUpload(new URL("/api/sources", baseURL), 200 * 1024 * 1024)).toBe(413);
+  // 200MB라고 알리고 본문은 보내지 않는다 → 본문을 읽기 전에 413 (로그인 쿠키는 함께 보낸다)
+  const cookie = (await request.storageState()).cookies.map((c) => `${c.name}=${c.value}`).join("; ");
+  expect(await statusOfDeclaredUpload(new URL("/api/sources", baseURL), 200 * 1024 * 1024, cookie)).toBe(413);
+  // 로그인하지 않았으면 크기와 상관없이 401
+  expect(await statusOfDeclaredUpload(new URL("/api/sources", baseURL), 200 * 1024 * 1024, "")).toBe(401);
 });
 
 /** Content-Length만 크게 알리고 본문은 보내지 않은 채 응답 상태를 받는다 (Playwright 요청은 길이를 실제 값으로 고친다) */
-function statusOfDeclaredUpload(url: URL, length: number): Promise<number> {
+function statusOfDeclaredUpload(url: URL, length: number, cookie: string): Promise<number> {
   return new Promise((resolve, reject) => {
     const req = http.request(
       url,
-      { method: "POST", headers: { "content-type": "multipart/form-data; boundary=x", "content-length": length } },
+      { method: "POST", headers: { "content-type": "multipart/form-data; boundary=x", "content-length": length, cookie } },
       (res) => {
         resolve(res.statusCode ?? 0);
         res.resume();

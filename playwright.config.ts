@@ -1,5 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
-import { E2E_PORT } from "./e2e/port";
+import { AUTH_STATE, E2E_PORT } from "./e2e/port";
 
 /**
  * 브라우저 e2e: npm run test:e2e (Docker 필요)
@@ -20,6 +20,8 @@ export default defineConfig({
   use: {
     // localhost여야 개발 서버가 HMR·개발용 리소스를 막지 않는다 (127.0.0.1은 다른 출처로 취급)
     baseURL: `http://localhost:${E2E_PORT}`,
+    // global-setup이 Passkey로 로그인해 둔 세션 (로그인 전 화면은 auth.spec에서 따로)
+    storageState: AUTH_STATE,
     locale: "ko-KR",
     timezoneId: "Asia/Seoul",
     navigationTimeout: 45_000,

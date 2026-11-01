@@ -312,3 +312,56 @@ export const people = mysqlTable("people", {
   name: varchar("name", { length: 50 }).notNull(),
   role: varchar("role", { length: 50 }).notNull(),
 });
+
+/* ───────── 로그인 (Passkey, 1인용) ───────── */
+/* 만료 시각 비교는 모두 DB 시각(CURRENT_TIMESTAMP)으로 — 서버·DB 시간대 차이에 흔들리지 않게 */
+
+/** 등록한 Passkey. id는 WebAuthn credential ID(base64url) */
+export const passkeys = mysqlTable("passkeys", {
+  id: varchar("id", { length: 255 }).primaryKey(),
+  /** COSE 공개키 (base64url) */
+  publicKey: text("public_key").notNull(),
+  counter: bigint("counter", { mode: "number", unsigned: true }).notNull().default(0),
+  transports: json("transports").$type<string[]>(),
+  deviceType: varchar("device_type", { length: 16 }).notNull(),
+  backedUp: boolean("backed_up").notNull(),
+  /** 등록한 기기 이름 (User-Agent로 추정: iPhone, Mac …) */
+  name: varchar("name", { length: 100 }).notNull(),
+  createdAt: createdAt(),
+  lastUsedAt: datetime("last_used_at", { mode: "string", fsp: 3 }),
+});
+
+/** 로그인 세션. 쿠키에는 원래 값, DB에는 SHA-256만 */
+export const authSessions = mysqlTable(
+  "auth_sessions",
+  {
+    idHash: char("id_hash", { length: 64 }).primaryKey(),
+    /** 이 세션을 만든 Passkey — 지우면 그 Passkey로 연 세션도 같이 끝난다 */
+    passkeyId: varchar("passkey_id", { length: 255 })
+      .notNull()
+      .references(() => passkeys.id, { onDelete: "cascade" }),
+    createdAt: createdAt(),
+    expiresAt: datetime("expires_at", { mode: "string", fsp: 3 }).notNull(),
+  },
+  (t) => [index("auth_sessions_expires").on(t.expiresAt)],
+);
+
+/** 등록·로그인 도전값 (한 번 쓰면 지움) */
+export const authChallenges = mysqlTable(
+  "auth_challenges",
+  {
+    id: char("id", { length: 32 }).primaryKey(),
+    challenge: varchar("challenge", { length: 128 }).notNull(),
+    purpose: varchar("purpose", { length: 12 }).$type<"register" | "login">().notNull(),
+    expiresAt: datetime("expires_at", { mode: "string", fsp: 3 }).notNull(),
+  },
+  (t) => [index("auth_challenges_expires").on(t.expiresAt)],
+);
+
+/** 첫 Passkey(또는 로그인할 수 없을 때 새 Passkey) 등록용 1회 초대. 서버에서 CLI로만 만든다 */
+export const authInvites = mysqlTable("auth_invites", {
+  tokenHash: char("token_hash", { length: 64 }).primaryKey(),
+  createdAt: createdAt(),
+  expiresAt: datetime("expires_at", { mode: "string", fsp: 3 }).notNull(),
+  usedAt: datetime("used_at", { mode: "string", fsp: 3 }),
+});

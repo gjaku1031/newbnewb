@@ -123,7 +123,24 @@ bash infra/oci/deploy/install.sh
      `docker exec ken-blog-caddy-1 caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile`
      `docker exec ken-blog-caddy-1 caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile`
    - 내리기: 블록을 지우고 리로드 (newb 컨테이너는 그대로 둬도 외부에서 안 보임).
-4. 운영 빌드는 Passkey 로그인 전까지 **항상 비로그인**이라 "로그인이 필요해요" 화면만 나오고 데이터는 나가지 않습니다(`/api/workspace` 401).
+4. 로그인하지 않으면 로그인 화면만 나오고 데이터는 나가지 않습니다(`/api/workspace` 401).
+
+### Passkey 등록 (처음 한 번, 또는 로그인할 기기가 하나도 없을 때)
+
+공개 주소라 첫 Passkey는 **서버에서 만든 1회용 초대 링크**로만 만들 수 있습니다 (30분 안에 한 번, 쓰면 끝).
+
+```bash
+ssh -t oci-prod 'docker exec newb-app-1 node passkey-invite.cjs'
+```
+
+1. 나온 링크(`https://newb.maekr.cloud/?invite=…`)를 Passkey를 만들 기기에서 엽니다. 링크는 비밀번호처럼 다루고, 쓰고 나면 버립니다.
+2. "이 기기에 Passkey 만들기" → Face ID·지문·기기 암호로 확인 → 바로 로그인됩니다.
+3. 다른 기기:
+   - 같은 iCloud 키체인(iPhone·iPad·Mac)이나 같은 Google 계정의 기기는 그 Passkey로 바로 로그인됩니다.
+   - Windows 등은 로그인 창에서 휴대폰으로 QR을 찍어 로그인한 뒤, **설정 → 로그인 → 이 기기에 Passkey 추가**.
+   - 아니면 그 기기용으로 초대 링크를 하나 더 만들어도 됩니다.
+- 앱 주소(`APP_ORIGIN`, `deploy/compose.yaml`)에 Passkey가 묶입니다. 도메인을 바꾸면 Passkey를 다시 만들어야 합니다.
+- 기기를 잃어버리면: 다른 기기로 로그인해 설정에서 그 Passkey를 지웁니다 (그 Passkey로 연 세션도 함께 끝남). 남은 기기가 없으면 위 초대 링크로 새로 만듭니다.
 
 ## 2026-10-30 공용 MySQL 재생성 기록
 

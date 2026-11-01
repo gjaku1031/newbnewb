@@ -5,7 +5,14 @@ import type { WorkspaceSnapshot } from "../src/lib/workspace";
  * 공통 fixture: 페이지 오류·콘솔 오류를 모아 두었다가 테스트 끝에 없는지 확인한다.
  * 개발 서버 특유의 소음(HMR 연결 등)과, 테스트가 일부러 낸 오류(allowErrors)는 거른다.
  */
-const IGNORED = [/\[HMR\]/, /webpack-hmr/, /Download the React DevTools/, /\/api\/agentation/];
+const IGNORED = [
+  /\[HMR\]/,
+  /webpack-hmr/,
+  /Download the React DevTools/,
+  /\/api\/agentation/,
+  // 개발 모드 전용 안내: 로그인 화면은 페이지 대신 그려져 Next가 그 페이지의 즉시 이동을 검사하지 못한다고 알린다
+  /Could not validate that a segment in your UI has instant navigation/,
+];
 
 export const test = base.extend<{ errors: string[]; allowErrors: RegExp | null; trackSaves: void }>({
   /** 테스트가 일부러 낸 오류 (test.use({ allowErrors: /…/ })) */

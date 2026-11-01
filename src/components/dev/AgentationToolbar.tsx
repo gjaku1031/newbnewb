@@ -15,8 +15,9 @@ export function AgentationToolbar() {
   useEffect(() => {
     let alive = true;
     fetch("/api/auth/me", { cache: "no-store" })
-      .then((r) => {
-        if (alive && r.ok) setEndpoint(`${window.location.origin}/api/agentation`);
+      .then((r) => (r.ok ? r.json() : null))
+      .then((body: { user?: unknown } | null) => {
+        if (alive && body?.user) setEndpoint(`${window.location.origin}/api/agentation`);
       })
       .catch(() => {});
     return () => {

@@ -36,7 +36,9 @@ export default function SettingsPage() {
             <Suspense fallback={null}>
               <AiSettings />
             </Suspense>
-            <AccountSettings />
+            <Suspense fallback={null}>
+              <AccountSettings />
+            </Suspense>
             <Suspense fallback={null}>
               <DataSettings />
             </Suspense>
