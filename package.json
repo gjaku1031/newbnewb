@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "typecheck": "next typegen && tsc --noEmit",
     "annotations": "agentation-mcp server --port 4747",
     "infra:up": "docker compose up -d",
     "infra:down": "docker compose down",
