@@ -108,7 +108,8 @@ bash infra/oci/deploy/install.sh
 
 oci-prod의 80/443은 ken-blog 스택의 Caddy(`ken-blog-caddy-1`, 설정 `/srv/ken-blog-live/deploy/Caddyfile`)가 받고 있습니다. 새 Caddy 없이 여기에 붙입니다.
 
-1. Cloudflare DNS: `newb.maekr.cloud` A → `158.101.158.194` (**DNS only**, Caddy가 Let's Encrypt 인증서 발급)
+1. ✅ Cloudflare DNS: `newb.maekr.cloud` A → `158.101.158.194` (**DNS only**, Caddy가 Let's Encrypt 인증서 발급) — 2026-11-01 생성.
+   토큰은 이 컴퓨터의 `~/.config/cloudflare/env`(`CF_API_TOKEN`)에 있고, 레코드는 Cloudflare API로 만들었습니다. Caddy 블록이 없는 동안엔 연결 단계에서 끊겨 아무것도 열리지 않습니다.
 2. newb 컨테이너를 Caddy 네트워크(`ken-blog_default`, external)에 별칭 `newb`로 연결
 3. Caddyfile에 사이트 블록 추가 후 무중단 리로드 — 파일은 bind mount라 **같은 파일에 덮어써야** 함(`sed -i`처럼 새 파일로 바꾸면 컨테이너가 옛 파일을 봄)
    ```

@@ -243,7 +243,7 @@ cautions       주의할 점 (point, wrong, by_role, source, next_review, interv
 | 결과물 회수 | ~~submit_draft 제출~~ → **Claude Desktop 채팅 출력으로 확인** (1차 QA 변경) | 앱엔 퀘스트별 작업 지침만 저장 |
 | hwp | **보류 (검토 중)** | 후보: ① 사용자가 hwpx로 변환 후 작업 ② Claude in Chrome/Computer Use로 웹 한글에서 작업. MVP에선 읽기(텍스트 추출)만 |
 | 서버 | oci-prod 확인 완료 | 아래 8-2 참고 |
-| 도메인 | `maekr.cloud` (Cloudflare) 서브도메인 — **나중에 결정** | Tailscale만 쓰면 Claude Desktop 원격 MCP가 접근 불가 → MCP 단계(P6) 전엔 공개 도메인 필요 |
+| 도메인 | **`newb.maekr.cloud`** (Cloudflare, DNS only → oci-prod) — 2026-11-01 레코드 생성 | Tailscale만 쓰면 Claude Desktop 원격 MCP가 접근 불가 → MCP 단계(P6) 전엔 공개 도메인 필요 |
 | 브리핑 시간 | **앱에서 설정** | 사용자 설정 테이블 + 스케줄러가 매 분/5분마다 "보낼 시간 된 브리핑" 확인 |
 | 로그인 | **Passkey** (WebAuthn) | HTTPS + 고정 도메인 필요 (RP ID). 로컬 개발은 localhost로 가능 |
 
@@ -267,5 +267,4 @@ cautions       주의할 점 (point, wrong, by_role, source, next_review, interv
 
 ### 8-4. 남은 열린 질문
 - hwp 작성 방식 최종 결정
-- 도메인 서브도메인 이름 (예: `newb.maekr.cloud`)
 - LLM 모델 조합 및 월 예산 상한

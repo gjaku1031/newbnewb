@@ -211,6 +211,7 @@ docs/PLAN.md               기획·결정 기록
 - [x] 메모 처리기·위키 편집기·위키 검토기를 Claude API로 교체 (별도 판정 모델은 빼고 Claude가 직접 판단)
 - [ ] iPhone·iPad Safari 최적화, PWA·푸시 알림
 - [x] CI/CD: GitHub Actions(검사·e2e·arm64 이미지) → oci-prod 자동 배포 (서버 내부 `127.0.0.1:18090`)
-- [ ] 외부 공개: `newb.maekr.cloud` DNS + ken-blog Caddy에 사이트 블록 (Passkey 뒤)
+- [x] `newb.maekr.cloud` DNS 레코드 (Cloudflare, DNS only → oci-prod)
+- [ ] 외부 공개: ken-blog Caddy에 사이트 블록 (Passkey 뒤)
 
 자세한 기획과 결정 사항은 [docs/PLAN.md](docs/PLAN.md)에 있습니다.
