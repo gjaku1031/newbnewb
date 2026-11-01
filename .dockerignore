@@ -8,3 +8,7 @@ docs
 *.pem
 npm-debug.log*
 .DS_Store
+.next-e2e
+test-results
+playwright-report
+.github

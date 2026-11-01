@@ -1,0 +1,99 @@
+# CI: 모든 푸시·PR에서 린트·타입·통합 테스트·빌드·e2e
+# CD: main에 들어오면(또는 수동 실행) arm64 이미지를 GHCR에 올린다.
+#     운영 서버(oci-prod)는 타이머로 새 이미지를 가져가 배포한다 — infra/oci/deploy
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  # main은 배포 순서가 꼬이지 않게 끝까지 돌린다
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+
+env:
+  NEXT_TELEMETRY_DISABLED: "1"
+
+jobs:
+  check:
+    name: 린트·타입·테스트·빌드
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run lint
+      - run: npx tsc --noEmit
+      # 통합 테스트는 testcontainers로 MySQL을 띄운다 (러너의 Docker 사용)
+      - run: npx vitest run
+      - run: npm run build
+
+  e2e:
+    name: 브라우저 e2e
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npx playwright install --with-deps chromium
+      # global-setup이 격리된 MySQL·S3·개발 서버를 띄운다
+      - run: npm run test:e2e
+      - name: 실패 기록 올리기
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-results
+          path: test-results/
+          retention-days: 7
+
+  image:
+    name: 운영 이미지 (arm64)
+    needs: [check, e2e]
+    # main 푸시, 또는 다른 브랜치에서 수동 실행했을 때만 (PR은 올리지 않음)
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: 태그 정하기
+        id: tags
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY,,}"
+          tags="${image}:sha-${GITHUB_SHA}"
+          # 운영 서버는 :main 태그를 따라간다
+          if [ "$GITHUB_REF" = "refs/heads/main" ]; then tags="${tags},${image}:main"; fi
+          echo "tags=${tags}" >> "$GITHUB_OUTPUT"
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/arm64
+          push: true
+          tags: ${{ steps.tags.outputs.tags }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

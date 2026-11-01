@@ -1,0 +1,39 @@
+# newb 운영 컨테이너 (oci-prod:/srv/newb/deploy/compose.yaml)
+# deploy.sh가 NEWB_IMAGE(이미지 digest)를 정해 실행한다. 직접 실행하지 말 것.
+name: newb
+
+services:
+  app:
+    image: ${NEWB_IMAGE:?deploy.sh가 이미지를 지정해야 해요}
+    # 이미지는 deploy.sh가 미리 받아 둔다
+    pull_policy: never
+    restart: unless-stopped
+    # 저장소 밖 비밀값 파일 (권한 600, 원문 그대로 주입)
+    env_file:
+      - path: /srv/newb/newb.env
+        required: true
+        format: raw
+      - path: /srv/newb/object-storage.env
+        required: true
+        format: raw
+      # Claude API 키 — 없으면 규칙 처리기로 동작
+      - path: /srv/newb/anthropic.env
+        required: false
+        format: raw
+    # 아직 외부 공개 전: 서버 안에서만 접속 (도메인·Caddy·Passkey를 붙일 때 연다)
+    ports:
+      - "127.0.0.1:18090:3000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
+      start_period: 60s
+      start_interval: 2s
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    mem_limit: 768m
+    cpus: 1.0
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"

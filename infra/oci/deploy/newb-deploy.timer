@@ -1,0 +1,10 @@
+[Unit]
+Description=newb 새 이미지 확인 (2분마다)
+
+[Timer]
+OnBootSec=2min
+OnUnitInactiveSec=2min
+RandomizedDelaySec=15s
+
+[Install]
+WantedBy=timers.target

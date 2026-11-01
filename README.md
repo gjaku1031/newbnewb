@@ -7,8 +7,8 @@
 ![대시보드](docs/images/dashboard.png)
 
 > **현재 단계: 백엔드 연결**
-> 모든 화면이 MySQL·Object Storage에 저장됩니다. 판정기·위키 검토기·메모 처리기는 아직 규칙 기반 목업이고,
-> 로그인(Passkey)과 Claude 연동(MCP)은 붙이지 않았습니다. → [로드맵](#로드맵)
+> 모든 화면이 MySQL·Object Storage에 저장됩니다. 메모 정리·위키 주석 반영·위키 모순 검토는 **Claude API**가 처리합니다
+> (`ANTHROPIC_API_KEY`가 없으면 규칙 기반 목업). 로그인(Passkey)과 Claude Desktop 연동(MCP)은 아직입니다. → [로드맵](#로드맵)
 
 ---
 
@@ -23,15 +23,16 @@
         └────────┘
             │ 근거 수집
             ▼
- 질문 ─▶ Decision Model ─┬─ 확답 (출처 포함)
+ 질문 ─▶ Claude 판단 ────┬─ 확답 (출처 포함)
  (Claude Desktop)        ├─ 조건부 답 + 확인할 점
                          └─ 알아올 것 (상사에게 물을 문장, 찾을 문서)
                                    │ 알아온 답
                                    └──────────▶ 다시 위키로
 ```
 
-- **채팅은 Claude Desktop에서만** 합니다. 이 앱은 MCP 서버로 위키·판정·작업 지침을 제공하고, 결과를 기록·정리하는 역할입니다.
-- 판정기(Decision Model), 위키 검토기, 위키 편집기, 메모 처리기는 모두 **입출력이 고정된 인터페이스**로 분리되어 있어 구현체(규칙 기반 목업 → Claude)를 갈아끼울 수 있습니다.
+- **채팅은 Claude Desktop에서만** 합니다. 이 앱은 MCP 서버로 위키 근거·작업 지침을 제공하고, 결과를 기록·정리하는 역할입니다.
+- 확답할지·알아와야 할지는 별도 판정 모델 없이 **Claude가 직접 판단**합니다 (예전 Decision Model 계획은 2026-11-01에 뺐습니다).
+- 위키 검토기·위키 편집기·메모 처리기는 인터페이스로 분리되어 있고, 운영에선 Claude 구현체(`src/server/ai/`), API 키가 없으면 규칙 기반 목업을 씁니다.
 
 ## 화면
 
@@ -41,9 +42,9 @@
 | **작업** (`/tasks`) | 같은 데이터를 **캘린더 / 데이터베이스(표)** 보기로 전환, 둘 다 월별. 유형·진행 상태·태그 필터, 완료 숨기기 |
 | **위키** (`/wiki`) | Next.js 문서 사이트 스타일. 본문에 **주석**을 달아 Claude에게 한 번에 반영 요청 → diff → 모순 검토 → 반영, 변경 이력 |
 | **메모** (`/memos`) | 오타 섞인 러프한 메모 ↔ Claude 정리본 + 반영 내역(일정·할 일·알아올 것·위키 갱신). 화면 오른쪽 아래 **빠른 메모** 버튼 |
-| **질문 기록** (`/questions`) | Claude Desktop에서 한 질문의 판정 결과, 판정 신호, 알아올 것(상사에게 물을 문장) |
+| **질문 기록** (`/questions`) | Claude Desktop에서 한 질문의 답(확답·조건부·알아올 것), Claude가 그렇게 답한 이유, 알아올 것(상사에게 물을 문장) |
 | **재배치 제안** (`/reschedule`) | 일이 몰리면 마감·우선순위(P0~P5) 기준 재배치안, 항목별 수락 |
-| **설정** (`/settings`) | 대시보드 알림, Claude Desktop(MCP) 연결, 판정 기준값, Passkey |
+| **설정** (`/settings`) | 대시보드 알림, Claude Desktop(MCP) 연결, Claude API 상태, Passkey |
 
 <table>
   <tr>
@@ -133,14 +134,15 @@ npm run dev          # http://localhost:3000
 
 ### 운영 연결 (oci-prod)
 
-앱 컨테이너는 `infra/oci`가 만든 두 파일을 `env_file`로 읽습니다.
+앱 컨테이너는 아래 세 파일을 `env_file`로 읽습니다 (`anthropic.env`는 직접 만듦 — [infra/oci](infra/oci/README.md#claude-api-키-넣기)).
 
 | 파일 | 앱이 쓰는 값 |
 |---|---|
 | `/srv/newb/newb.env` | `DATABASE_URL` (`…?ssl=true` → TLS 암호화. 사설 CA로 검증하려면 `DATABASE_SSL_CA_FILE` 추가) |
 | `/srv/newb/object-storage.env` | `OCI_AUTH=instance_principal` `OCI_REGION` `OCI_NAMESPACE` `OCI_BUCKET` → OCI SDK로 버킷 접근 |
+| `/srv/newb/anthropic.env` | `ANTHROPIC_API_KEY` (선택: `CLAUDE_MODEL`, 기본 `claude-opus-5-5`) → 메모 정리·위키 편집·모순 검토 |
 
-- 마이그레이션: 같은 이미지로 `node migrate.cjs` (배포 전에 한 번)
+- 배포: **main에 푸시하면 자동**. GitHub Actions가 검사·e2e 후 arm64 이미지를 GHCR에 올리고, oci-prod 타이머가 2분 안에 가져가 마이그레이션 → 교체 → 상태 확인(실패 시 되돌림) — [infra/oci](infra/oci/README.md#3-배포-cicd--deploy)
 - 시드(`db:seed`)는 개발용이라 운영 DB에는 넣지 않습니다.
 
 다른 기기(같은 Tailscale 망 등)에서 개발 서버에 접속하려면 `.env.local`에 허용할 주소를 적습니다.
@@ -177,11 +179,12 @@ src/
 ├─ lib/
 │  ├─ types.ts             도메인 타입 (Item, WikiPage, QuestionRecord …)
 │  ├─ items.ts · itemStore.ts   항목 헬퍼 · 클라이언트 스토어
-│  ├─ wikiReview.ts        위키 모순 검토기 인터페이스 (WikiReviewer)
-│  ├─ wikiEditor.ts        주석 → 문서 수정 인터페이스 (WikiEditor)
-│  ├─ memoProcessor.ts     메모 처리기 인터페이스 (MemoProcessor)
+│  ├─ wikiReview.ts        위키 모순 검토기 인터페이스 (WikiReviewer) + 규칙 목업
+│  ├─ wikiEditor.ts        주석 → 문서 수정 인터페이스 (WikiEditor) + 패턴 목업
+│  ├─ memoProcessor.ts     메모 처리기 인터페이스 (MemoProcessor) + 규칙 목업
 │  └─ diff.ts              줄 단위 diff
 ├─ server/                 서버 전용 (server-only)
+│  ├─ ai/                  Claude API 구현체 — 메모 정리·위키 편집·모순 검토 (구조화 출력)
 │  ├─ db/                  Drizzle 스키마 · MySQL 연결 · 값 변환
 │  ├─ services/            도메인 로직 (항목·위키·메모·질문·재배치·원본·작업공간) — 테스트 대상
 │  ├─ actions.ts           서버 액션 (로그인 확인 → 검증 → 서비스)
@@ -205,8 +208,9 @@ docs/PLAN.md               기획·결정 기록
 - [x] 백엔드: MySQL 스키마, 서버 액션·Route Handlers, 서버 저장, 원본 업로드(Object Storage)
 - [ ] Passkey 로그인 (1인용)
 - [ ] MCP 서버 + Claude Desktop 커스텀 커넥터 (`ask_newb`, `get_task_brief`, `get_guidelines`, `add_to_wiki`)
-- [ ] 판정기·위키 검토기·메모 처리기를 Claude로 교체
+- [x] 메모 처리기·위키 편집기·위키 검토기를 Claude API로 교체 (별도 판정 모델은 빼고 Claude가 직접 판단)
 - [ ] iPhone·iPad Safari 최적화, PWA·푸시 알림
-- [ ] oci-prod 배포 (Docker arm64 + Caddy)
+- [x] CI/CD: GitHub Actions(검사·e2e·arm64 이미지) → oci-prod 자동 배포 (서버 내부 `127.0.0.1:18090`)
+- [ ] 외부 공개: `newb.maekr.cloud` DNS + ken-blog Caddy에 사이트 블록 (Passkey 뒤)
 
 자세한 기획과 결정 사항은 [docs/PLAN.md](docs/PLAN.md)에 있습니다.
