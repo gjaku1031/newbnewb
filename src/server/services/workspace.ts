@@ -7,6 +7,7 @@ import { listMemos } from "./memos";
 import { latestBriefings, latestReschedule, listQuestions } from "./records";
 import { listWiki } from "./wiki";
 import { listCautions } from "./cautions";
+import { claudeEnabled } from "@/server/ai/claude";
 
 /** 화면 전체가 쓰는 데이터를 한 번에 */
 export async function loadWorkspace(db: Exec): Promise<WorkspaceSnapshot> {
@@ -21,5 +22,5 @@ export async function loadWorkspace(db: Exec): Promise<WorkspaceSnapshot> {
     latestBriefings(db),
     latestReschedule(db),
   ]);
-  return { version, now: seoulNow(), items, tags, wiki, memos, questions, cautions, briefing, reschedule };
+  return { version, now: seoulNow(), items, tags, wiki, memos, questions, cautions, briefing, reschedule, claude: claudeEnabled() };
 }

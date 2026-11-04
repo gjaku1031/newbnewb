@@ -5,7 +5,7 @@ import type { z } from "zod";
 
 /**
  * Claude API 공통 호출.
- * ANTHROPIC_API_KEY가 있으면 Claude를 쓰고, 없으면(로컬·테스트) 각 처리기가 규칙 기반 목업으로 돌아간다.
+ * 메모 정리·위키 주석 반영·모순 검토는 Claude로만 한다. ANTHROPIC_API_KEY가 없으면 처리하지 않고 ClaudeUnavailableError.
  */
 export const CLAUDE_MODEL = process.env.CLAUDE_MODEL || "claude-opus-5-5";
 
@@ -15,6 +15,13 @@ let client: Anthropic | undefined;
 const getClient = () => (client ??= new Anthropic({ timeout: 300_000, maxRetries: 2 }));
 
 export class ClaudeError extends Error {}
+
+/** API 키가 없어 Claude를 부를 수 없음 — 화면에 그대로 보여줄 수 있는 문구 */
+export class ClaudeUnavailableError extends ClaudeError {
+  constructor() {
+    super("Claude API 키가 없어 처리하지 못했어요. 설정 → Claude API를 확인해 주세요.");
+  }
+}
 
 type Effort = "low" | "medium" | "high";
 
@@ -29,6 +36,7 @@ export async function askClaude<S extends z.ZodType>(opts: {
   effort: Effort;
   maxTokens?: number;
 }): Promise<z.infer<S>> {
+  if (!claudeEnabled()) throw new ClaudeUnavailableError();
   const res = await getClient().beta.messages.parse({
     model: CLAUDE_MODEL,
     max_tokens: opts.maxTokens ?? 16_000,

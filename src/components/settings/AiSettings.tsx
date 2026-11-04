@@ -23,9 +23,9 @@ export async function AiSettings() {
             사용 중 · {model}
           </span>
         ) : (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-warn-soft px-2.5 py-0.5 text-[12px] font-semibold text-warn">
-            <span className="size-1.5 rounded-full bg-warn" />
-            API 키 없음 · 간단한 규칙으로 처리 중
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-danger/10 px-2.5 py-0.5 text-[12px] font-semibold text-danger">
+            <span className="size-1.5 rounded-full bg-danger" />
+            API 키 없음 · 메모 정리·위키 반영·검토가 동작하지 않아요
           </span>
         )}
       </Row>

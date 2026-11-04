@@ -10,6 +10,7 @@ import type { ReviewSource, WikiReviewer } from "@/lib/wikiReview";
 import type { WikiEditor } from "@/lib/wikiEditor";
 import { defaultReviewer } from "@/server/ai/wikiReview";
 import { defaultEditor } from "@/server/ai/wikiEdit";
+import { ClaudeUnavailableError } from "@/server/ai/claude";
 import { getObjectBytes } from "@/server/storage";
 import { sources, wikiComments, wikiLinks, wikiPages, wikiPageSources, wikiRevisions } from "@/server/db/schema";
 import { dOut, dtIn, dtOut, opt } from "@/server/db/convert";
@@ -187,6 +188,14 @@ const REVIEW_FAILED: Conflict = {
   reason: "모순 검토를 끝내지 못했어요. 바뀐 내용을 직접 확인하고 반영하거나 취소하세요.",
 };
 
+/** API 키가 없어 검토하지 못함 */
+const REVIEW_NO_CLAUDE: Conflict = {
+  ref: { kind: "self", title: "Claude API 키 없음" },
+  excerpt: "",
+  changed: "",
+  reason: "Claude API 키가 없어 모순 검토를 하지 못했어요. 바뀐 내용을 직접 확인하고 반영하거나 취소하세요.",
+};
+
 /** 검토하는 사이 다른 변경이 먼저 반영된 경우 — 덮어쓰면 그 변경이 사라진다 */
 const STALE: Conflict = {
   ref: { kind: "self", title: "문서가 바뀜" },
@@ -245,8 +254,8 @@ export async function runReview(db: Db, id: string, reviewer: WikiReviewer = def
     const docs = await reviewSources(db, r.slug);
     conflicts = (await reviewer.review({ slug: r.slug, before: r.before, after: r.after }, pages, docs)).conflicts;
   } catch (error) {
-    console.error("[wiki] 검토 실패", id, error);
-    conflicts = [REVIEW_FAILED];
+    console.error("[wiki] 검토 실패", id, error instanceof ClaudeUnavailableError ? error.message : error);
+    conflicts = [error instanceof ClaudeUnavailableError ? REVIEW_NO_CLAUDE : REVIEW_FAILED];
   }
   if (conflicts.length === 0) {
     await applyRevision(db, id);
@@ -356,10 +365,12 @@ export async function requestClaudeEdit(db: Db, slug: string, editor: WikiEditor
     result = await editor.apply(before, comments, await titleResolver(db));
   } catch (error) {
     // 편집 실패 — 주석은 열린 채로 두고 이유만 남긴다 (다시 요청 가능)
-    console.error("[wiki] Claude 편집 실패", slug, error);
+    console.error("[wiki] Claude 편집 실패", slug, error instanceof ClaudeUnavailableError ? error.message : error);
+    const note =
+      error instanceof ClaudeUnavailableError ? error.message : "Claude가 반영하지 못했어요. 잠시 뒤 다시 요청해 주세요.";
     await db
       .update(wikiComments)
-      .set({ note: "Claude가 반영하지 못했어요. 잠시 뒤 다시 요청해 주세요." })
+      .set({ note })
       .where(inArray(wikiComments.id, comments.map((c) => c.id)));
     return null;
   }

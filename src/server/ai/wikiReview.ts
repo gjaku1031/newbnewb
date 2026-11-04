@@ -2,9 +2,9 @@ import "server-only";
 import type Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { diffLines } from "@/lib/diff";
-import { RuleReviewer, type ReviewSource, type WikiChange, type WikiReviewer } from "@/lib/wikiReview";
+import type { ReviewSource, WikiChange, WikiReviewer } from "@/lib/wikiReview";
 import type { Conflict, PageContent, ReviewResult } from "@/lib/wikiTypes";
-import { askClaude, claudeEnabled, CLAUDE_MODEL, tag } from "./claude";
+import { askClaude, CLAUDE_MODEL, tag } from "./claude";
 
 const ReviewSchema = z.object({
   conflicts: z.array(
@@ -101,5 +101,5 @@ export class ClaudeReviewer implements WikiReviewer {
   }
 }
 
-/** 지금 쓸 검토기 — API 키가 있으면 Claude */
-export const defaultReviewer = (): WikiReviewer => (claudeEnabled() ? new ClaudeReviewer() : new RuleReviewer());
+/** 위키 검토기 — Claude (키가 없으면 ClaudeUnavailableError) */
+export const defaultReviewer = (): WikiReviewer => new ClaudeReviewer();

@@ -8,6 +8,7 @@ import { MySqlContainer } from "@testcontainers/mysql";
 import { GenericContainer, Wait } from "testcontainers";
 import { AUTH_STATE, E2E_PORT } from "./port";
 import { addVirtualAuthenticator } from "./passkey";
+import { startFakeClaude } from "../test/fakeClaude";
 
 /**
  * e2e 준비: 격리된 MySQL·S3(RustFS)를 띄우고 → 마이그레이션·시드 → 그 DB를 보는 개발 서버를 띄운다.
@@ -30,6 +31,9 @@ export default async function globalSetup() {
       .start(),
   ]);
 
+  // 실제 Claude 대신 응답하는 가짜 API — 앱은 키가 있는 것처럼 실제 Claude 호출 경로를 탄다
+  const fakeClaude = await startFakeClaude();
+
   const env: NodeJS.ProcessEnv = {
     ...process.env,
     NODE_ENV: "development",
@@ -44,8 +48,9 @@ export default async function globalSetup() {
     NEXT_DIST_DIR: ".next-e2e",
     // 주석 툴바가 진짜 주석 서버로 보내지 않게
     AGENTATION_URL: "http://127.0.0.1:9",
-    // 실제 Claude API를 부르지 않고 규칙 처리기로 (결과가 매번 같아야 함)
-    ANTHROPIC_API_KEY: "",
+    // 실제 Claude API 대신 가짜 Claude 서버로 (결과가 매번 같아야 함)
+    ANTHROPIC_API_KEY: "e2e-fake-key",
+    ANTHROPIC_BASE_URL: fakeClaude.url,
     // 개발용 자동 로그인을 끄고 실제 Passkey 로그인으로 (가상 인증기 사용)
     NEWB_DEV_LOGIN: "off",
     APP_ORIGIN: `http://localhost:${E2E_PORT}`,
@@ -75,7 +80,7 @@ export default async function globalSetup() {
         // 이미 종료됨
       }
     }
-    await Promise.all([mysql.stop(), s3.stop()]);
+    await Promise.all([mysql.stop(), s3.stop(), fakeClaude.close()]);
   };
   try {
     await waitForHealth(server);

@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { RuleMemoProcessor } from "@/lib/memoProcessor";
-import { PatternEditor } from "@/lib/wikiEditor";
-import { RuleReviewer } from "@/lib/wikiReview";
+import { RuleMemoProcessor } from "./fixtures/rules/memo";
+import { RuleReviewer } from "./fixtures/rules/wikiReview";
 import type { WikiComment } from "@/lib/wikiTypes";
 
 /** Claude 처리기: 실제 API 대신 가짜 응답을 넣고, 응답을 앱에 맞게 검증·정리하는지 본다 */
@@ -23,11 +22,11 @@ const pages = [
   { slug: "corporate-card", title: "법인카드", summary: "사용 규정" },
 ];
 
-describe("API 키가 없으면", () => {
-  it("규칙 처리기로 돌아간다", () => {
-    expect(defaultMemoProcessor()).toBeInstanceOf(RuleMemoProcessor);
-    expect(defaultEditor()).toBeInstanceOf(PatternEditor);
-    expect(defaultReviewer()).toBeInstanceOf(RuleReviewer);
+describe("기본 처리기", () => {
+  it("메모 정리·위키 편집·검토는 모두 Claude (규칙 기반 대체 없음)", () => {
+    expect(defaultMemoProcessor()).toBeInstanceOf(ClaudeMemoProcessor);
+    expect(defaultEditor()).toBeInstanceOf(ClaudeEditor);
+    expect(defaultReviewer()).toBeInstanceOf(ClaudeReviewer);
   });
 });
 
@@ -142,7 +141,7 @@ describe("Claude 위키 검토기", () => {
   });
 });
 
-describe("규칙 기반 처리기 (API 키 없을 때) — 목데이터 없이 실제 데이터만 본다", () => {
+describe("테스트용 규칙 처리기 (가짜 Claude 서버가 씀) — 목데이터 없이 입력만 본다", () => {
   it("메모는 실제 위키 페이지 제목으로만 연결하고, 페이지가 없으면 연결하지 않는다", async () => {
     const memo = "주간보고 마감이 16시로 바뀐대";
     const pages = [

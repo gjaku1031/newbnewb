@@ -9,6 +9,7 @@ import { fmt } from "@/lib/date";
 import { useWiki } from "@/components/wiki/store";
 import { addMemo, deleteMemo, retryMemo, useMemos } from "./store";
 import { ItemLink } from "@/components/item/ItemPeek";
+import { useClaudeEnabled } from "@/components/workspace/hooks";
 
 const ACTION_ICON: Record<MemoActionKind, typeof CalendarPlus> = {
   create_event: CalendarPlus,
@@ -113,6 +114,7 @@ function ActionRow({ a }: { a: MemoAction }) {
 }
 
 function MemoCard({ memo }: { memo: Memo }) {
+  const claude = useClaudeEnabled();
   return (
     <article className="group grid overflow-hidden rounded-xl border border-line bg-surface shadow-card lg:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)]">
       {/* 내 메모 원문 */}
@@ -139,7 +141,7 @@ function MemoCard({ memo }: { memo: Memo }) {
         </div>
         {memo.status === "failed" ? (
           <div className="flex items-center gap-3 py-1 text-[13.5px]">
-            <span className="text-danger">정리하지 못했어요</span>
+            <span className="text-danger">{claude ? "정리하지 못했어요" : "Claude API 키가 없어 정리하지 못했어요"}</span>
             <button
               type="button"
               onClick={() => retryMemo(memo.id)}
@@ -174,14 +176,29 @@ function MemoCard({ memo }: { memo: Memo }) {
 
 export function MemoBoard() {
   const memos = useMemos();
+  const claude = useClaudeEnabled();
   return (
     <div className="mx-auto max-w-[1100px] space-y-6">
+      {!claude && <NoClaudeNotice />}
       <MemoComposer />
       <div className="space-y-3">
         {memos.map((m) => (
           <MemoCard key={m.id} memo={m} />
         ))}
       </div>
+    </div>
+  );
+}
+
+/** Claude API 키가 없을 때: 메모는 저장되지만 정리되지 않는다 */
+function NoClaudeNotice() {
+  return (
+    <div role="status" className="rounded-xl border border-warn/40 bg-warn-soft px-4 py-3 text-[13.5px] leading-relaxed">
+      <span className="font-semibold text-warn">Claude API 키가 없어요.</span> 메모는 저장되지만 정리되지 않아요. 키를 넣은 뒤
+      &lsquo;다시 정리&rsquo;를 누르세요.{" "}
+      <Link href="/settings#ai" className="font-medium underline underline-offset-2">
+        설정 보기
+      </Link>
     </div>
   );
 }

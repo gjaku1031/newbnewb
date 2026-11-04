@@ -1,6 +1,6 @@
 /**
  * 빠른 메모 — 급하게 대충(오타 포함) 적으면 Claude가 읽고 항목·위키를 갱신한다.
- * 실제로는 DB memos 테이블 + Claude(MCP) 처리, 지금은 목업 규칙 처리기.
+ * DB memos 테이블 + Claude 처리 (src/server/ai/memo.ts).
  */
 
 /** failed: 처리 중 오류 — 화면에서 다시 정리할 수 있다 */

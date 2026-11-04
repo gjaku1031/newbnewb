@@ -1,8 +1,8 @@
 import "server-only";
 import { z } from "zod";
-import { PatternEditor, type WikiEditor } from "@/lib/wikiEditor";
+import type { WikiEditor } from "@/lib/wikiEditor";
 import type { EditNote, PageContent, WikiComment } from "@/lib/wikiTypes";
-import { askClaude, claudeEnabled, CLAUDE_MODEL, ClaudeError, tag } from "./claude";
+import { askClaude, CLAUDE_MODEL, ClaudeError, tag } from "./claude";
 
 const EditSchema = z.object({
   title: z.string(),
@@ -65,5 +65,5 @@ export class ClaudeEditor implements WikiEditor {
   }
 }
 
-/** 지금 쓸 편집기 — API 키가 있으면 Claude */
-export const defaultEditor = (): WikiEditor => (claudeEnabled() ? new ClaudeEditor() : new PatternEditor());
+/** 위키 편집기 — Claude (키가 없으면 ClaudeUnavailableError) */
+export const defaultEditor = (): WikiEditor => new ClaudeEditor();

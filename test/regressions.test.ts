@@ -1,7 +1,7 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import type { MemoProcessor } from "@/lib/memoProcessor";
-import { RuleMemoProcessor } from "@/lib/memoProcessor";
+import { RuleMemoProcessor } from "./fixtures/rules/memo";
 import type { WikiReviewer } from "@/lib/wikiReview";
 import type { WikiEditor } from "@/lib/wikiEditor";
 import { seedDemo } from "./fixtures/seed";
@@ -211,5 +211,49 @@ describe("재배치·항목 저장", () => {
       { id: "s1", title: "b", done: false },
     ];
     expect(ItemInput.safeParse({ ...base, subItems: dup }).success).toBe(false);
+  });
+});
+
+describe("Claude API 키가 없으면 — 대신 처리하지 않고 이유를 남긴다", () => {
+  const key = process.env.ANTHROPIC_API_KEY;
+  beforeEach(() => {
+    delete process.env.ANTHROPIC_API_KEY;
+    return () => {
+      process.env.ANTHROPIC_API_KEY = key;
+    };
+  });
+
+  it("작업공간에 키가 없다고 알린다", async () => {
+    const { loadWorkspace } = await import("@/server/services/workspace");
+    expect((await loadWorkspace(db)).claude).toBe(false);
+  });
+
+  it("메모는 저장되지만 정리하지 않고 '실패'로 남는다 (항목도 안 만듦)", async () => {
+    await memosService.addMemo(db, { id: "nk1", text: "내일 3시 거래처 미팅" });
+    const before = (await items.listItems(db)).length;
+    await memosService.processMemo(db, "nk1");
+    const m = await memoOf("nk1");
+    expect(m.status).toBe("failed");
+    expect(m.result).toBeFalsy();
+    expect((await items.listItems(db)).length).toBe(before);
+  });
+
+  it("주석 반영 요청은 문서를 바꾸지 않고 주석에 이유를 남긴다", async () => {
+    const body = (await wiki.pageContent(db, "weekly-report"))!.body;
+    await wiki.addComment(db, { id: "nk-c1", slug: "weekly-report", anchor: null, text: "17:00 → 16:00" });
+    expect(await wiki.requestClaudeEdit(db, "weekly-report")).toBeNull();
+    expect((await wiki.pageContent(db, "weekly-report"))!.body).toBe(body);
+    const c = (await wiki.listWiki(db)).comments.find((x) => x.id === "nk-c1")!;
+    expect(c.status).toBe("open");
+    expect(c.note).toContain("Claude API 키가 없어");
+  });
+
+  it("변경 검토는 하지 않고 '확인 필요'로 남긴다 (사용자가 직접 반영·취소)", async () => {
+    const cur = (await wiki.pageContent(db, "weekly-report"))!;
+    const r = await wiki.submitRevision(db, { slug: "weekly-report", after: { ...cur, summary: "새 요약" }, message: "요약 수정" });
+    await wiki.runReview(db, r.id);
+    const [row] = await db.select().from(wikiRevisions).where(eq(wikiRevisions.id, r.id));
+    expect(row.status).toBe("pending");
+    expect(row.conflicts?.[0].reason).toContain("Claude API 키가 없어");
   });
 });

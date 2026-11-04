@@ -13,7 +13,7 @@ import { fmt } from "@/lib/date";
 import { diffLines, diffStats } from "@/lib/diff";
 import { Markdown, extractHeadings } from "@/lib/markdown";
 import { Button } from "@/components/ui";
-import { useSources, useTitleOf } from "@/components/workspace/hooks";
+import { useClaudeEnabled, useSources, useTitleOf } from "@/components/workspace/hooks";
 import { DiffView } from "./DiffView";
 import { IssueBox } from "./IssueBox";
 import { OnThisPage } from "./OnThisPage";
@@ -107,6 +107,7 @@ export function WikiArticle({
   after?: React.ReactNode;
   aside?: React.ReactNode;
 }) {
+  const claude = useClaudeEnabled();
   const s = useWiki();
   const titleOf = useTitleOf();
   const cautions = cautionsForWiki(useCautions(), base.slug);
@@ -233,7 +234,13 @@ export function WikiArticle({
             <Button size="sm" onClick={() => startComment(null)}>
               <MessageSquarePlus className="size-3.5" /> 주석
             </Button>
-            <Button size="sm" variant="primary" onClick={request} disabled={open.length === 0 || requesting}>
+            <Button
+              size="sm"
+              variant="primary"
+              onClick={request}
+              disabled={open.length === 0 || requesting || !claude}
+              title={claude ? undefined : "Claude API 키가 없어 반영할 수 없어요 (설정 → Claude API)"}
+            >
               {requesting ? <Loader2 className="size-3.5 animate-spin" /> : <Bot className="size-3.5" />}
               Claude에게 반영 요청{open.length > 0 && <span className="tabular">({open.length})</span>}
             </Button>

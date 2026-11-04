@@ -3,8 +3,8 @@ import { format, parseISO } from "date-fns";
 import { ko } from "date-fns/locale";
 import { z } from "zod";
 import { isRealDate } from "@/lib/date";
-import { RuleMemoProcessor, type MemoPlan, type MemoProcessor, type WikiPageRef } from "@/lib/memoProcessor";
-import { askClaude, claudeEnabled, CLAUDE_MODEL, tag } from "./claude";
+import type { MemoPlan, MemoProcessor, WikiPageRef } from "@/lib/memoProcessor";
+import { askClaude, CLAUDE_MODEL, tag } from "./claude";
 
 const opt = z.string().nullable();
 
@@ -76,5 +76,5 @@ export class ClaudeMemoProcessor implements MemoProcessor {
   }
 }
 
-/** 지금 쓸 메모 처리기 — API 키가 있으면 Claude */
-export const defaultMemoProcessor = (): MemoProcessor => (claudeEnabled() ? new ClaudeMemoProcessor() : new RuleMemoProcessor());
+/** 메모 처리기 — Claude (키가 없으면 처리 때 ClaudeUnavailableError) */
+export const defaultMemoProcessor = (): MemoProcessor => new ClaudeMemoProcessor();

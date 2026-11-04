@@ -29,6 +29,8 @@ export interface WorkspaceSnapshot {
   cautions: Caution[];
   briefing: { morning: MorningBriefing | null; evening: EveningBriefing | null };
   reschedule: RescheduleProposal | null;
+  /** Claude API 키가 있는지 — 없으면 메모 정리·위키 주석 반영·모순 검토가 돌지 않는다 */
+  claude: boolean;
 }
 
 export interface WikiData {

@@ -75,7 +75,7 @@ ssh -t oci-prod 'umask 077 && read -rsp "ANTHROPIC_API_KEY: " k && echo && print
 ssh oci-prod '/srv/newb/deploy/deploy.sh "$(cat /srv/newb/deploy/current)"'
 ```
 
-키가 없으면 앱은 규칙 기반 처리기로 동작합니다 (설정 → Claude API에서 상태 확인).
+키가 없으면 메모 정리·위키 주석 반영·모순 검토가 동작하지 않습니다 (설정 → Claude API에서 상태 확인).
 
 ## 3. 배포 (CI/CD) — `deploy/`
 

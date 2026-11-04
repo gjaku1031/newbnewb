@@ -5,6 +5,7 @@ import type { Memo, MemoAction } from "@/lib/memoTypes";
 import { fmt } from "@/lib/date";
 import type { MemoPlan, MemoProcessor } from "@/lib/memoProcessor";
 import { defaultMemoProcessor } from "@/server/ai/memo";
+import { ClaudeUnavailableError } from "@/server/ai/claude";
 import { seoulNow, seoulToday } from "@/lib/today";
 import { memos, wikiPages } from "@/server/db/schema";
 import { dtIn, dtOut, opt } from "@/server/db/convert";
@@ -32,7 +33,7 @@ export async function deleteMemo(db: Exec, id: string) {
 const day = (d: string) => fmt(d, "M/d (EEE)");
 
 /**
- * 메모 처리: 처리기(Claude, 키가 없으면 규칙 목업)가 만든 계획을 항목·위키에 반영하고 한 일을 기록.
+ * 메모 처리: Claude가 만든 계획을 항목·위키에 반영하고 한 일을 기록.
  * 위키 갱신은 변경 요청으로 만들고, 커밋 뒤 검토를 돌린다.
  */
 export async function processMemo(db: Db, id: string, processor: MemoProcessor = defaultMemoProcessor()) {
@@ -54,7 +55,7 @@ export async function processMemo(db: Db, id: string, processor: MemoProcessor =
     });
   } catch (error) {
     // 같은 이유로 계속 실패하며 무한히 다시 돌지 않게 '실패'로 남긴다 (화면에서 다시 정리 가능)
-    console.error("[memo] 처리 실패", id, error);
+    console.error("[memo] 처리 실패", id, error instanceof ClaudeUnavailableError ? error.message : error);
     await db.update(memos).set({ status: "failed" }).where(and(eq(memos.id, id), eq(memos.status, "processing")));
     return;
   }

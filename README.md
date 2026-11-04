@@ -8,7 +8,7 @@
 
 > **현재 단계: 백엔드 연결**
 > 모든 화면이 MySQL·Object Storage에 저장됩니다. 메모 정리·위키 주석 반영·위키 모순 검토는 **Claude API**가 처리합니다
-> (`ANTHROPIC_API_KEY`가 없으면 규칙 기반 목업). Claude Desktop 연동(MCP)은 아직입니다. → [로드맵](#로드맵)
+> (`ANTHROPIC_API_KEY`가 없으면 이 세 기능은 동작하지 않고, 화면에 키가 없다고 알립니다). Claude Desktop 연동(MCP)은 아직입니다. → [로드맵](#로드맵)
 
 ---
 
@@ -32,7 +32,7 @@
 
 - **채팅은 Claude Desktop에서만** 합니다. 이 앱은 MCP 서버로 위키 근거·작업 지침을 제공하고, 결과를 기록·정리하는 역할입니다.
 - 확답할지·알아와야 할지는 별도 판정 모델 없이 **Claude가 직접 판단**합니다 (예전 Decision Model 계획은 2026-11-01에 뺐습니다).
-- 위키 검토기·위키 편집기·메모 처리기는 인터페이스로 분리되어 있고, 운영에선 Claude 구현체(`src/server/ai/`), API 키가 없으면 규칙 기반 목업을 씁니다.
+- 위키 검토기·위키 편집기·메모 처리기는 인터페이스로 분리되어 있고, 구현은 Claude(`src/server/ai/`)뿐입니다. API 키가 없으면 대신 처리하지 않습니다 — 메모는 '정리하지 못함', 주석은 열린 채로 이유, 위키 변경은 '확인 필요'로 남습니다.
 
 ## 화면
 
@@ -183,9 +183,9 @@ src/
 ├─ lib/
 │  ├─ types.ts             도메인 타입 (Item, WikiPage, QuestionRecord …)
 │  ├─ items.ts · itemStore.ts   항목 헬퍼 · 클라이언트 스토어
-│  ├─ wikiReview.ts        위키 모순 검토기 인터페이스 (WikiReviewer) + 규칙 목업
-│  ├─ wikiEditor.ts        주석 → 문서 수정 인터페이스 (WikiEditor) + 패턴 목업
-│  ├─ memoProcessor.ts     메모 처리기 인터페이스 (MemoProcessor) + 규칙 목업
+│  ├─ wikiReview.ts        위키 모순 검토기 인터페이스 (WikiReviewer)
+│  ├─ wikiEditor.ts        주석 → 문서 수정 인터페이스 (WikiEditor)
+│  ├─ memoProcessor.ts     메모 처리기 인터페이스 (MemoProcessor)
 │  └─ diff.ts              줄 단위 diff
 ├─ server/                 서버 전용 (server-only)
 │  ├─ ai/                  Claude API 구현체 — 메모 정리·위키 편집·모순 검토 (구조화 출력)
@@ -197,7 +197,8 @@ src/
 drizzle/                   DB 마이그레이션 SQL
 scripts/                   마이그레이션 실행기
 test/                      통합 테스트 (Testcontainers MySQL)
-└─ fixtures/               테스트 전용 목데이터·시드 (앱 코드는 쓰지 않음)
+└─ fixtures/               테스트 전용 목데이터·시드·규칙 처리기 (앱 코드는 쓰지 않음)
+   (test/fakeClaude.ts: 테스트가 실제 Claude 대신 부르는 가짜 Claude API)
 e2e/                       브라우저 e2e (Playwright) — global-setup이 격리된 DB·S3·개발 서버를 띄움
 compose.yaml · Dockerfile  로컬 인프라 · 앱 이미지
 docs/PLAN.md               기획·결정 기록
