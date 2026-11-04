@@ -31,6 +31,8 @@ export interface WorkspaceSnapshot {
   reschedule: RescheduleProposal | null;
   /** Claude API 키가 있는지 — 없으면 메모 정리·위키 주석 반영·모순 검토가 돌지 않는다 */
   claude: boolean;
+  /** Claude Desktop(MCP) 연결 — 마지막 호출은 UTC "YYYY-MM-DD HH:mm:ss" */
+  mcp: { connections: number; lastUsedAt: string | null };
   /** 대시보드 알림 설정 (아침 브리핑 시각·요일, 0=일 … 6=토) */
   settings: { morningTime: string; days: number[] };
 }

@@ -146,12 +146,29 @@ function briefing(text: string) {
   };
 }
 
+/** ask_newb: 위키 근거가 있으면 첫 페이지 첫 문장으로 답, 없으면 팀장님께 물어보라고 */
+function ask(text: string) {
+  const page = tags(one(text, "wiki_pages"), "wiki_page")[0];
+  if (!page)
+    return {
+      verdict: "NEED_INFO",
+      confidence: 0.2,
+      rationale: "관련 위키가 없어요",
+      answer: "",
+      citations: [],
+      missing: [{ kind: "ask_person", target: "팀장님", what: one(text, "question"), suggestedScript: "팀장님, 여쭤봐도 될까요?" }],
+    };
+  const line = page.body.split("\n").find((l) => l.trim() && !l.startsWith("#")) ?? page.body;
+  return { verdict: "ANSWER", confidence: 0.9, rationale: "위키에 있어요", answer: line, citations: [{ wikiSlug: page.attrs.slug, excerpt: line }], missing: [] };
+}
+
 async function answer(req: MessagesRequest) {
   const system = req.system ?? "";
   const content = req.messages[0]?.content ?? "";
   const text = typeof content === "string" ? content : content.map((b) => b.text ?? "").join("\n\n");
   // 브리핑 시스템 프롬프트도 "업무 비서"로 시작하니 먼저 본다
   if (system.includes("브리핑을 씁니다")) return briefing(text);
+  if (system.includes("업무 중에 물은 질문에 답합니다")) return ask(text);
   if (system.includes("업무 비서")) return memo(text);
   if (system.includes("원본 문서(사내 규정")) return organize(text);
   if (system.includes("위키의 편집자")) return edit(text);

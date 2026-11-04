@@ -11,7 +11,7 @@ import { addVirtualAuthenticator } from "./passkey";
 import { startFakeClaude } from "../test/fakeClaude";
 
 /**
- * e2e 준비: 격리된 MySQL·S3(RustFS)를 띄우고 → 마이그레이션·시드 → 그 DB를 보는 개발 서버를 띄운다.
+ * e2e 준비: 격리된 MySQL·S3(RustFS)를 띄우고 → 마이그레이션·시드 → 그 DB로 운영과 같은 빌드(next build → next start)를 띄운다.
  * 평소 개발 서버·DB는 건드리지 않는다 (빌드 폴더 .next-e2e, 포트 E2E_PORT).
  * 빌드 폴더는 .next 안에 두면 안 된다 — Turbopack이 무시하지 않아 캐시를 쓸 때마다 다시 컴파일·새로고침한다.
  */
@@ -20,7 +20,7 @@ export default async function globalSetup() {
   // 서버 로그는 프로젝트 밖에 쓴다 — 프로젝트 안에 쓰면 개발 서버가 그 변화를 보고 다시 컴파일하며 페이지를 새로고침한다
   const logDir = path.join(os.tmpdir(), "newb-e2e");
   mkdirSync(logDir, { recursive: true });
-  console.log(`e2e 개발 서버 로그: ${path.join(logDir, "next-dev.log")}`);
+  console.log(`e2e 서버 로그: ${path.join(logDir, "next-dev.log")}`);
 
   const [mysql, s3] = await Promise.all([
     new MySqlContainer("mysql:26.10.0").withDatabase("newb_e2e").start(),
@@ -36,7 +36,10 @@ export default async function globalSetup() {
 
   const env: NodeJS.ProcessEnv = {
     ...process.env,
-    NODE_ENV: "development",
+    // 운영과 같은 빌드로 띄운다 (개발 서버는 파일 변화·HMR로 페이지가 다시 불려 Passkey 등록 같은 긴 동작이 깨지곤 했다)
+    NODE_ENV: "production",
+    // 예약 작업(아침 브리핑)은 테스트 중에 돌지 않게
+    NEWB_SCHEDULER: "off",
     DATABASE_URL: mysql.getConnectionUri(),
     DATABASE_SSL: "off",
     OCI_AUTH: "",
@@ -54,6 +57,8 @@ export default async function globalSetup() {
     // 개발용 자동 로그인을 끄고 실제 Passkey 로그인으로 (가상 인증기 사용)
     NEWB_DEV_LOGIN: "off",
     APP_ORIGIN: `http://localhost:${E2E_PORT}`,
+    // MCP 연결 테스트용 콜백 (실제로는 Claude 주소만 허용)
+    MCP_EXTRA_REDIRECT_URIS: `http://localhost:${E2E_PORT}/oauth-test-callback`,
   };
 
   await createBucket(env);
@@ -66,7 +71,9 @@ export default async function globalSetup() {
   process.env.E2E_INVITE = invite();
 
   const log = openSync(path.join(logDir, "next-dev.log"), "w");
-  const server = spawn("npx", ["next", "dev", "-H", "127.0.0.1", "-p", String(E2E_PORT)], {
+  console.log("e2e 빌드 중 (next build)…");
+  execFileSync("npx", ["next", "build"], { cwd: root, env, stdio: ["ignore", log, log] });
+  const server = spawn("npx", ["next", "start", "-H", "127.0.0.1", "-p", String(E2E_PORT)], {
     cwd: root,
     env,
     stdio: ["ignore", log, log],
@@ -116,7 +123,7 @@ async function createBucket(env: NodeJS.ProcessEnv) {
 async function waitForHealth(server: ChildProcess) {
   const deadline = Date.now() + 180_000;
   while (Date.now() < deadline) {
-    if (server.exitCode !== null) throw new Error(`e2e 개발 서버가 종료됐어요 (로그: ${os.tmpdir()}/newb-e2e/next-dev.log)`);
+    if (server.exitCode !== null) throw new Error(`e2e 서버가 종료됐어요 (로그: ${os.tmpdir()}/newb-e2e/next-dev.log)`);
     try {
       const res = await fetch(`http://localhost:${E2E_PORT}/api/health`);
       if (res.ok) return;
@@ -125,7 +132,7 @@ async function waitForHealth(server: ChildProcess) {
     }
     await new Promise((r) => setTimeout(r, 1_000));
   }
-  throw new Error("e2e 개발 서버가 3분 안에 준비되지 않았어요");
+  throw new Error("e2e 서버가 3분 안에 준비되지 않았어요");
 }
 
 /**

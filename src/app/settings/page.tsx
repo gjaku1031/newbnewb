@@ -32,7 +32,9 @@ export default function SettingsPage() {
           </nav>
           <div className="space-y-6">
             <DashboardSettings />
-            <ClaudeSettings />
+            <Suspense fallback={null}>
+              <ClaudeSettings />
+            </Suspense>
             <Suspense fallback={null}>
               <AiSettings />
             </Suspense>

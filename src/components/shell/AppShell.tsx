@@ -17,7 +17,7 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { useReschedule } from "@/components/workspace/hooks";
+import { useMcpStatus, useReschedule } from "@/components/workspace/hooks";
 
 /* 데스크톱 사이드바 접힘 상태 — 브라우저에 기억 (Ctrl/⌘ + \ 로 토글) */
 const COLLAPSE_KEY = "newb.sidebar.collapsed";
@@ -62,6 +62,7 @@ function isActive(pathname: string, href: string) {
 function SidebarContent({ onNavigate, onCollapse }: { onNavigate?: () => void; onCollapse?: () => void }) {
   const pathname = usePathname();
   const proposal = useReschedule();
+  const mcp = useMcpStatus();
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center gap-2.5 px-4 pt-5 pb-4">
@@ -138,16 +139,22 @@ function SidebarContent({ onNavigate, onCollapse }: { onNavigate?: () => void; o
           <Settings className="size-[17px]" strokeWidth={1.9} />
           설정
         </Link>
-        {/* TODO(MCP): 실제 연결 상태 */}
         <Link
           href="/settings#claude"
           onClick={onNavigate}
           className="block rounded-lg bg-surface px-3 py-2.5 ring-1 ring-line hover:bg-black/[0.02] dark:hover:bg-white/[0.03]"
         >
-          <div className="flex items-center gap-2 text-[12.5px] font-medium text-muted">
-            <span className="inline-flex size-2 rounded-full bg-faint" />
-            Claude Desktop 연결 전
-          </div>
+          {mcp.connections > 0 ? (
+            <div className="flex items-center gap-2 text-[12.5px] font-medium">
+              <span className="inline-flex size-2 rounded-full bg-ok" />
+              Claude Desktop 연결됨
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 text-[12.5px] font-medium text-muted">
+              <span className="inline-flex size-2 rounded-full bg-faint" />
+              Claude Desktop 연결 전
+            </div>
+          )}
         </Link>
       </div>
     </div>

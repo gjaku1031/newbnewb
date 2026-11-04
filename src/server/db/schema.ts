@@ -396,3 +396,46 @@ export const scheduledRuns = mysqlTable(
   },
   (t) => [primaryKey({ columns: [t.job, t.runDate] })],
 );
+
+/* ───────── Claude Desktop 연결 (MCP + OAuth) ───────── */
+/* 코드·토큰은 원래 값이 아니라 SHA-256만 저장한다 */
+
+/** 동적 등록한 OAuth 클라이언트 (Claude) */
+export const oauthClients = mysqlTable("oauth_clients", {
+  id: varchar("id", { length: 64 }).primaryKey(),
+  name: varchar("name", { length: 200 }).notNull(),
+  redirectUris: json("redirect_uris").$type<string[]>().notNull(),
+  createdAt: createdAt(),
+});
+
+/** 승인 코드 (5분, 한 번) */
+export const oauthCodes = mysqlTable("oauth_codes", {
+  codeHash: char("code_hash", { length: 64 }).primaryKey(),
+  clientId: varchar("client_id", { length: 64 })
+    .notNull()
+    .references(() => oauthClients.id, { onDelete: "cascade" }),
+  redirectUri: varchar("redirect_uri", { length: 1000 }).notNull(),
+  codeChallenge: varchar("code_challenge", { length: 128 }).notNull(),
+  scope: varchar("scope", { length: 200 }),
+  resource: varchar("resource", { length: 500 }),
+  expiresAt: datetime("expires_at", { mode: "string", fsp: 3 }).notNull(),
+});
+
+/** 접근·갱신 토큰. grantId = 한 번의 승인에서 나온 토큰 묶음 (갱신·연결 끊기 단위) */
+export const oauthTokens = mysqlTable(
+  "oauth_tokens",
+  {
+    tokenHash: char("token_hash", { length: 64 }).primaryKey(),
+    kind: varchar("kind", { length: 8 }).$type<"access" | "refresh">().notNull(),
+    grantId: char("grant_id", { length: 32 }).notNull(),
+    clientId: varchar("client_id", { length: 64 })
+      .notNull()
+      .references(() => oauthClients.id, { onDelete: "cascade" }),
+    scope: varchar("scope", { length: 200 }),
+    resource: varchar("resource", { length: 500 }),
+    expiresAt: datetime("expires_at", { mode: "string", fsp: 3 }).notNull(),
+    lastUsedAt: datetime("last_used_at", { mode: "string", fsp: 3 }),
+    createdAt: createdAt(),
+  },
+  (t) => [index("oauth_tokens_grant").on(t.grantId), index("oauth_tokens_expires").on(t.expiresAt)],
+);

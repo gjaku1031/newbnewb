@@ -8,7 +8,7 @@
 
 > **현재 단계: 백엔드 연결**
 > 모든 화면이 MySQL·Object Storage에 저장됩니다. 메모 정리·위키 주석 반영·위키 모순 검토는 **Claude API**가 처리합니다
-> (`ANTHROPIC_API_KEY`가 없으면 이 세 기능은 동작하지 않고, 화면에 키가 없다고 알립니다). Claude Desktop 연동(MCP)은 아직입니다. → [로드맵](#로드맵)
+> (`ANTHROPIC_API_KEY`가 없으면 이 세 기능은 동작하지 않고, 화면에 키가 없다고 알립니다). Claude Desktop은 커스텀 커넥터(MCP)로 연결합니다. → [로드맵](#로드맵)
 
 ---
 
@@ -88,7 +88,7 @@
 - 테스트: Vitest + Testcontainers(MySQL), Playwright e2e
 - 운영: oci-prod(arm64) + ken-blog의 Caddy → `https://newb.maekr.cloud`
 - 로그인: Passkey(WebAuthn, SimpleWebAuthn) — 1인용, 첫 등록은 서버에서 만든 1회용 초대 링크로
-- 예정: MCP 서버(`/api/mcp`)
+- MCP 서버(`/api/mcp`, Streamable HTTP·상태 없음) + OAuth 인가 서버(`/oauth/authorize`, `/api/oauth/*`, `/.well-known/*`)
 
 ## 시작하기
 
@@ -112,7 +112,7 @@ npm run dev          # http://localhost:3000
 - 스키마 변경: `src/server/db/schema.ts` 수정 → `npm run db:generate` → `npm run db:migrate`
 - 초기화: `docker compose down -v` (데이터까지 삭제)
 - 테스트: `npm test` — 운영과 같은 MySQL 26.10.0을 Testcontainers로 띄워 저장·위키 검토·메모 처리·재배치를 검증 (Docker 필요)
-- e2e: `npm run test:e2e` — 격리된 MySQL·S3와 e2e 전용 개발 서버(포트 3100, 빌드 폴더 `.next-e2e`)를 띄워 브라우저로 주요 흐름을 검증. 평소 개발 서버·DB는 건드리지 않습니다 (Docker 필요, 처음 한 번 `npx playwright install chromium`)
+- e2e: `npm run test:e2e` — 격리된 MySQL·S3와 e2e 전용 서버(운영 빌드, 포트 3100, 빌드 폴더 `.next-e2e`)를 띄워 브라우저로 주요 흐름을 검증. 평소 개발 서버·DB는 건드리지 않습니다 (Docker 필요, 처음 한 번 `npx playwright install chromium`)
   - 결과: `test-results/report` (실패하면 스크린샷·trace), 서버 로그: `/tmp/newb-e2e/next-dev.log`
 
 ### 데이터 흐름
@@ -132,7 +132,7 @@ npm run dev          # http://localhost:3000
 - 로그인: Passkey 세션 쿠키(HttpOnly, 운영은 `__Host-` + Secure, 30일) → DB `auth_sessions`(해시만 저장)로 확인 (`src/lib/auth.ts`, `src/server/services/auth.ts`).
   - 첫 Passkey는 서버에서 만든 1회용 초대 링크로만 등록합니다(공개 주소라 아무나 먼저 등록하지 못하게). 그 뒤 기기 추가·삭제·로그아웃은 설정에서.
   - `next dev`는 기본으로 로그인된 상태입니다. 실제 로그인을 보려면 `.env.local`에 `NEWB_DEV_LOGIN=off`, `APP_ORIGIN=http://localhost:3000`을 넣고 `npm run auth:invite`로 링크를 만듭니다(Passkey는 https나 localhost에서만 동작).
-  - e2e는 실제 Passkey 로그인으로 돕니다 — Chrome 가상 인증기로 등록해 그 세션을 모든 테스트가 씁니다.
+  - e2e는 운영과 같은 빌드(`next build` → `next start`)를 띄우고 실제 Passkey 로그인으로 돕니다 — Chrome 가상 인증기로 등록해 그 세션을 모든 테스트가 씁니다. Claude 호출은 가짜 Claude 서버(`test/fakeClaude.ts`)로 갑니다.
 - "오늘"은 한국 시간 기준이며, 서버가 스냅샷에 담아 보낸 시각으로 맞춥니다 (`src/lib/today.ts`).
 - 사람 이름·내부 메모·자료 제공자는 DB에만 있고 화면으로 보내지 않습니다 (Claude 답변용).
 
@@ -155,6 +155,15 @@ npm run dev          # http://localhost:3000
 # .env.local
 DEV_ORIGINS=100.x.x.x,my-dev-host
 ```
+
+### Claude Desktop 연결 (MCP)
+
+1. Claude Desktop → 설정 → 커넥터 → **커스텀 커넥터 추가** → 이름 `newb`, URL `https://newb.maekr.cloud/api/mcp`
+2. **연결**을 누르면 newb 승인 화면이 열림 → Passkey로 로그인 → **허용**
+3. 도구: `ask_newb`(위키·원본 근거로 답하고 질문 기록), `get_task_brief`(할 일 지침·관련 위키·주의할 점), `get_guidelines`(찾기), `add_to_wiki`(원본 정리로 위키에 반영)
+
+- 콜백은 Claude 주소(`https://claude.ai|claude.com/api/mcp/auth_callback`)만 등록할 수 있고, 토큰·코드는 DB에 해시로만 둡니다 (접근 1시간, 갱신 90일·회전).
+- 설정 → Claude Desktop 연결에서 연결 상태·마지막 호출을 보고 연결을 끊을 수 있습니다.
 
 ### 화면 주석(Agentation)으로 QA하기
 
@@ -211,7 +220,9 @@ docs/PLAN.md               기획·결정 기록
 - [x] 인프라: 로컬 Docker(MySQL·S3), Drizzle 마이그레이션, 앱 이미지
 - [x] 백엔드: MySQL 스키마, 서버 액션·Route Handlers, 서버 저장, 원본 업로드(Object Storage)
 - [x] Passkey 로그인 (1인용, 초대 링크로 첫 등록, 설정에서 기기 추가·삭제·로그아웃)
-- [ ] MCP 서버 + Claude Desktop 커스텀 커넥터 (`ask_newb`, `get_task_brief`, `get_guidelines`, `add_to_wiki`)
+- [x] MCP 서버 + Claude Desktop 커스텀 커넥터 (`ask_newb`, `get_task_brief`, `get_guidelines`, `add_to_wiki`) — OAuth(동적 등록·PKCE) + Passkey 승인
+- [x] 원본 글자 읽기(docx·xlsx·pptx·hwp·hwpx) → Claude가 위키로 정리
+- [x] 아침 브리핑·지난 정리·재배치 제안 자동 생성(설정한 요일·시각), 위키 내보내기
 - [x] 메모 처리기·위키 편집기·위키 검토기를 Claude API로 교체 (별도 판정 모델은 빼고 Claude가 직접 판단)
 - [ ] iPhone·iPad Safari 최적화, PWA·푸시 알림
 - [x] CI/CD: GitHub Actions(검사·e2e·arm64 이미지) → oci-prod 자동 배포
