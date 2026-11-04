@@ -105,11 +105,55 @@ async function review(text: string) {
   };
 }
 
+/** 원본 정리: 원본 하나 → 같은 제목의 페이지가 있으면 고치고(내용 덧붙임), 없으면 새로 만든다 */
+function organize(text: string) {
+  const src = tags(text, "source")[0];
+  if (!src) return { note: "글자로 읽을 수 없는 원본이라 정리하지 않았어요 (가짜 Claude)", pages: [] };
+  const title = src.attrs.title;
+  const pages = tags(one(text, "existing_wiki"), "wiki_page").map((p) => ({ slug: p.attrs.slug, category: p.attrs.category, body: p.body }));
+  const same = pages.find((p) => p.body.startsWith(`# ${title}\n`));
+  const firstLine = src.body.split("\n").find((l) => l.trim()) ?? title;
+  if (same) {
+    const oldBody = same.body.split("\n\n").slice(2).join("\n\n");
+    return {
+      note: `기존 페이지에 «${title}» 내용을 더했어요`,
+      pages: [{ action: "update", slug: same.slug, title, category: same.category, summary: firstLine.slice(0, 100), body: `${oldBody}\n\n${src.body}` }],
+    };
+  }
+  const slug = `doc-${[...title].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7).toString(36)}`;
+  return {
+    note: `«${title}»를 새 페이지로 정리했어요`,
+    pages: [{ action: "create", slug, title, category: "일반", summary: firstLine.slice(0, 100), body: src.body }],
+  };
+}
+
+/** 아침 브리핑: 안 끝난 일 앞의 3개를 오늘 할 일로, 복습할 위키 앞의 3개를 복습으로 */
+function briefing(text: string) {
+  const ids = (name: string) =>
+    one(text, name)
+      .split("\n")
+      .map((l) => l.match(/^- ([^ |]+) \|/)?.[1])
+      .filter((x): x is string => !!x);
+  const added = one(text, "since_last").split("새 위키:\n")[1]?.split("\n\n")[0] ?? "";
+  return {
+    greeting: "좋은 아침이에요 (가짜 Claude)",
+    focus: ids("open_items").slice(0, 3),
+    reviews: ids("due_reviews").slice(0, 3).map((slug) => ({ slug, reason: "다시 볼 때예요" })),
+    heads_up: [],
+    learned: added === "(없음)" ? [] : added.split("\n").map((l) => l.replace(/^- /, "")),
+    note: "",
+    reschedule: null,
+  };
+}
+
 async function answer(req: MessagesRequest) {
   const system = req.system ?? "";
   const content = req.messages[0]?.content ?? "";
   const text = typeof content === "string" ? content : content.map((b) => b.text ?? "").join("\n\n");
+  // 브리핑 시스템 프롬프트도 "업무 비서"로 시작하니 먼저 본다
+  if (system.includes("브리핑을 씁니다")) return briefing(text);
   if (system.includes("업무 비서")) return memo(text);
+  if (system.includes("원본 문서(사내 규정")) return organize(text);
   if (system.includes("위키의 편집자")) return edit(text);
   if (system.includes("위키의 검토자")) return review(text);
   throw new Error("가짜 Claude: 모르는 요청");

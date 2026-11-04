@@ -7,6 +7,7 @@ import { sources } from "@/server/db/schema";
 import type { Exec } from "@/server/db/types";
 import { newId } from "@/server/ids";
 import { deleteObject, getObjectBytes, putObject } from "@/server/storage";
+import { extractText } from "@/server/extract";
 
 /**
  * 올릴 수 있는 파일 — 종류와 내려줄 Content-Type을 확장자로 정한다.
@@ -60,6 +61,9 @@ export async function createSource(db: Exec, file: { name: string; bytes: Uint8A
       contentType,
       sizeBytes: file.bytes.byteLength,
       sha256: createHash("sha256").update(file.bytes).digest("hex"),
+      // 글자를 뽑아 두고(검토·검색용), 위키로 정리하도록 대기열에 올린다
+      text: await extractText(fileType, file.bytes),
+      wikiStatus: "processing",
     });
   } catch (error) {
     // DB에 못 쓰면 올린 파일도 지운다

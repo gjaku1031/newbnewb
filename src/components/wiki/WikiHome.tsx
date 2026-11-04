@@ -3,7 +3,10 @@
 import { useState } from "react";
 import Link from "next/link";
 import { ReviewDoneButton } from "@/components/ReviewDoneButton";
-import { AlertTriangle, ArrowRight, Brain, Clock, Inbox, Unlink } from "lucide-react";
+import { AlertTriangle, ArrowRight, Brain, Clock, Inbox, Loader2, Unlink } from "lucide-react";
+import type { Source } from "@/lib/types";
+import { mutate, refresh } from "@/components/workspace/store";
+import * as actions from "@/server/actions";
 import { fmt } from "@/lib/date";
 import { TODAY } from "@/lib/today";
 import { useSources, useWikiPages } from "@/components/workspace/hooks";
@@ -43,11 +46,21 @@ export function WikiHome() {
   );
   const dueReviews = dueSlugs.flatMap((slug) => wikiPages.filter((p) => p.slug === slug));
   const issuePages = wikiPages.filter((p) => p.issues?.length);
-  const recentSources = [...sources].sort((a, b) => b.addedAt.localeCompare(a.addedAt)).slice(0, 5);
+  // 정리 중·실패한 원본은 항상, 나머지는 최근 것 몇 개
+  const newest = [...sources].reverse();
+  const attention = newest.filter((s) => s.wiki?.status === "processing" || s.wiki?.status === "failed");
+  const recentSources = [...attention, ...newest.filter((s) => !attention.includes(s)).slice(0, Math.max(0, 6 - attention.length))];
 
   return (
     <div className="space-y-10">
       <PendingPanel />
+
+      {wikiPages.length === 0 && (
+        <div className="rounded-xl border border-dashed border-line-strong px-5 py-6 text-[14px] leading-relaxed text-muted">
+          아직 위키가 비어 있어요. 사내 규정·매뉴얼·양식 같은 <span className="font-medium text-ink">원본을 올리면</span> Claude가 읽고
+          주제별 위키 페이지로 정리해요.
+        </div>
+      )}
 
       {/* 장 카드 */}
       <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
@@ -132,6 +145,9 @@ export function WikiHome() {
 
         <Panel title="최근 들어온 원본" icon={<Inbox className="size-4" />}>
           <ul className="px-2 pb-2.5">
+            {recentSources.length === 0 && (
+              <li className="px-2 py-2 text-[13px] text-muted">원본을 올리면 Claude가 읽고 위키로 정리해요</li>
+            )}
             {recentSources.map((s) => (
               <li key={s.id} className="flex items-center gap-2.5 rounded-lg px-2 py-1.5">
                 <FileIcon type={s.fileType} className="size-7" />
@@ -147,6 +163,7 @@ export function WikiHome() {
                     <SourceTypeBadge type={s.type} />
                     {fmt(s.addedAt, "M/d")}
                   </span>
+                  <SourceWikiStatus source={s} />
                 </span>
               </li>
             ))}
@@ -167,5 +184,42 @@ export function WikiCounts() {
       <span>·</span>
       <span>원본 {sources.length}</span>
     </div>
+  );
+}
+
+/** 원본을 위키로 정리한 상태 한 줄 */
+function SourceWikiStatus({ source }: { source: Source }) {
+  const w = source.wiki;
+  if (!w) return null;
+  if (w.status === "processing")
+    return (
+      <span className="mt-0.5 flex items-center gap-1 text-[11.5px] text-accent-ink">
+        <Loader2 className="size-3 animate-spin" />
+        Claude가 위키로 정리하는 중
+      </span>
+    );
+  if (w.status === "failed")
+    return (
+      <span className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[11.5px] text-danger">
+        <span title={w.note}>{w.note ?? "위키로 정리하지 못했어요"}</span>
+        <button
+          type="button"
+          className="font-medium text-ink underline underline-offset-2"
+          onClick={async () => {
+            await mutate(null, () => actions.retryOrganizeSource(source.id));
+            await refresh();
+          }}
+        >
+          다시 정리
+        </button>
+      </span>
+    );
+  const made = (w.created?.length ?? 0) > 0 ? `새 페이지 ${w.created!.length}` : "";
+  const changed = (w.updated?.length ?? 0) > 0 ? `수정 ${w.updated!.length}` : "";
+  const summary = [made, changed].filter(Boolean).join(" · ");
+  return (
+    <span className="mt-0.5 block truncate text-[11.5px] text-muted" title={w.note}>
+      {summary ? `위키 ${summary}` : (w.note ?? "위키에 남길 내용이 없었어요")}
+    </span>
   );
 }

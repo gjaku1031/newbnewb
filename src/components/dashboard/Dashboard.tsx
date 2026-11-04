@@ -29,6 +29,7 @@ import { TODAY, NOW } from "@/lib/today";
 import { useBriefing, useQuestions, useWikiPages } from "@/components/workspace/hooks";
 import type { EveningBriefing, Item, MorningBriefing, QuestionRecord } from "@/lib/types";
 import { ItemLink } from "@/components/item/ItemPeek";
+import { BriefingCard } from "./BriefingCard";
 
 /** 오늘 할 일: 오늘 배치됐거나 마감이 오늘까지인 미완료 할 일 (기다리는 중 제외) */
 function todayTasks(items: Item[]): Item[] {
@@ -84,7 +85,9 @@ export function Dashboard() {
   const questions = useQuestions();
   const wikiPages = useWikiPages();
   const briefing = useBriefing();
-  const morningBriefing = briefing.morning ?? EMPTY_MORNING;
+  // 오늘 만든 브리핑만 (지난 날 것은 보여주지 않음)
+  const todayMorning = briefing.morning?.date === TODAY ? briefing.morning : null;
+  const morningBriefing = todayMorning ?? EMPTY_MORNING;
   const getWikiPage = (slug: string) => wikiPages.find((p) => p.slug === slug);
   const tagOf = (id: string): Tag | undefined => tags.find((d) => d.id === id);
   const getItem = (id: string) => items.find((i) => i.id === id);
@@ -368,6 +371,8 @@ export function Dashboard() {
 
           {/* ── 오른쪽 ── */}
           <div className="space-y-5">
+            <BriefingCard morning={todayMorning} />
+
             <Card className="p-5">
               <div className="text-[13px] text-muted">이번 주 성취율</div>
               <div className="mt-3 flex items-center gap-4">
@@ -382,6 +387,7 @@ export function Dashboard() {
             <Card>
               <CardTitle icon={<Megaphone className="size-4" />}>미리 알아두기</CardTitle>
               <ul className="space-y-2.5 px-5 pb-5">
+                {morningBriefing.heads_up.length === 0 && <li className="text-[13px] text-muted">아직 없어요</li>}
                 {morningBriefing.heads_up.map((h, i) => (
                   <li key={i} className="flex gap-2.5 text-[13.5px] leading-relaxed">
                     <span className="mt-[8px] size-1.5 shrink-0 rounded-full bg-accent" />
@@ -430,6 +436,7 @@ export function Dashboard() {
             <Card>
               <CardTitle icon={<BookOpenCheck className="size-4" />}>오늘 복습할 위키</CardTitle>
               <ul className="space-y-1 px-3 pb-4">
+                {reviews.length === 0 && <li className="px-2 text-[13px] text-muted">오늘은 없어요</li>}
                 {reviews.map((r) => (
                   <li key={r.slug} className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-sunken">
                     <Link href={`/wiki/${r.slug}`} className="min-w-0 flex-1 py-0.5">

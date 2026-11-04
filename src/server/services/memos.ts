@@ -10,7 +10,7 @@ import { seoulNow, seoulToday } from "@/lib/today";
 import { memos, wikiPages } from "@/server/db/schema";
 import { dtIn, dtOut, opt } from "@/server/db/convert";
 import type { Db, Exec } from "@/server/db/types";
-import { affectedRows, stalledBefore } from "./jobs";
+import { affectedRows, stalledBefore, STALLED_MS } from "./jobs";
 import { newId } from "@/server/ids";
 import { writeItem } from "./items";
 import { pageContent, runReview, submitRevisionTx } from "./wiki";
@@ -170,7 +170,7 @@ async function applyPlan(tx: Exec, plan: MemoPlan, today: string, memoId: string
 }
 
 /** 끊긴 메모 처리 다시 돌리기 */
-export async function resumeStalledMemos(db: Db, olderThanMs = 30_000) {
+export async function resumeStalledMemos(db: Db, olderThanMs = STALLED_MS) {
   const isStalled = (id?: string) =>
     and(id ? eq(memos.id, id) : undefined, eq(memos.status, "processing"), lt(memos.updatedAt, stalledBefore(olderThanMs)));
   const stalled = await db.select({ id: memos.id }).from(memos).where(isStalled());

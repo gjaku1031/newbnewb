@@ -1,8 +1,9 @@
-import { connection } from "next/server";
+import { after, connection } from "next/server";
 import { withUser } from "@/server/auth";
 import { getDb } from "@/server/db/client";
 import { createSource, MAX_UPLOAD_BYTES, SourceError } from "@/server/services/sources";
 import { SourceTypeInput } from "@/server/validation";
+import { organizeSource } from "@/server/services/sourceWiki";
 
 /** 원본 문서 올리기 (multipart: files[], type) — 서버 액션 크기 한도(1MB)를 피해 Route Handler로 받는다 */
 export async function POST(request: Request) {
@@ -33,6 +34,18 @@ export async function POST(request: Request) {
     } catch (error) {
       if (error instanceof SourceError) return Response.json({ error: error.message, ids }, { status: 400 });
       throw error;
+    } finally {
+      // 응답 뒤 Claude가 하나씩 위키로 정리 (앞 원본이 만든 페이지를 뒤 원본이 고칠 수 있게 차례로)
+      if (ids.length)
+        after(async () => {
+          for (const id of ids) {
+            try {
+              await organizeSource(db, id);
+            } catch (error) {
+              console.error("[source-wiki] 정리 실패", id, error);
+            }
+          }
+        });
     }
     return Response.json({ ids }, { status: 201 });
   });

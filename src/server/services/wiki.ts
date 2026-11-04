@@ -15,7 +15,7 @@ import { getObjectBytes } from "@/server/storage";
 import { sources, wikiComments, wikiLinks, wikiPages, wikiPageSources, wikiRevisions } from "@/server/db/schema";
 import { dOut, dtIn, dtOut, opt } from "@/server/db/convert";
 import type { Db, Exec } from "@/server/db/types";
-import { affectedRows, stalledBefore } from "./jobs";
+import { affectedRows, stalledBefore, STALLED_MS } from "./jobs";
 
 /* ───────── 조회 ───────── */
 
@@ -24,7 +24,20 @@ export async function listWiki(db: Exec): Promise<WikiData> {
     db.select().from(wikiPages).orderBy(asc(wikiPages.createdOn), asc(wikiPages.slug)),
     db.select().from(wikiPageSources).orderBy(asc(wikiPageSources.sort)),
     db.select().from(wikiLinks).orderBy(asc(wikiLinks.sort)),
-    db.select().from(sources).orderBy(asc(sources.addedOn), asc(sources.createdAt)),
+    // 원본 글자(text)는 크니 화면용 목록에서는 읽지 않는다
+    db
+      .select({
+        id: sources.id,
+        title: sources.title,
+        type: sources.type,
+        fileType: sources.fileType,
+        addedOn: sources.addedOn,
+        objectKey: sources.objectKey,
+        wikiStatus: sources.wikiStatus,
+        wikiResult: sources.wikiResult,
+      })
+      .from(sources)
+      .orderBy(asc(sources.addedOn), asc(sources.createdAt)),
     db.select().from(wikiRevisions).orderBy(asc(wikiRevisions.slug), asc(wikiRevisions.version)),
     db.select().from(wikiComments).orderBy(asc(wikiComments.at)),
   ]);
@@ -52,6 +65,7 @@ export async function listWiki(db: Exec): Promise<WikiData> {
       fileType: s.fileType as Source["fileType"],
       addedAt: dOut(s.addedOn)!,
       hasFile: !!s.objectKey,
+      ...(s.wikiStatus ? { wiki: { status: s.wikiStatus, ...(s.wikiResult ?? {}) } } : {}),
     }),
   );
 
@@ -209,31 +223,25 @@ const REVIEW_PDF_BYTES = 15 * 1024 * 1024;
 const REVIEW_IMAGE_BYTES = 5 * 1024 * 1024;
 const REVIEW_TEXT_CHARS = 200_000;
 
-/** 페이지에 붙은 원본 문서를 Claude가 읽을 수 있는 형태로 (docx·hwp 등은 제목만) */
+/** 페이지에 붙은 원본 문서를 Claude가 읽을 수 있는 형태로 (글자를 뽑아 둔 원본은 그 글자, PDF·이미지는 파일 그대로) */
 async function reviewSources(db: Exec, slug: string): Promise<ReviewSource[]> {
   const rows = await db
-    .select({ title: sources.title, objectKey: sources.objectKey, fileType: sources.fileType, sizeBytes: sources.sizeBytes })
+    .select({ title: sources.title, objectKey: sources.objectKey, fileType: sources.fileType, sizeBytes: sources.sizeBytes, text: sources.text })
     .from(wikiPageSources)
     .innerJoin(sources, eq(sources.id, wikiPageSources.sourceId))
     .where(eq(wikiPageSources.slug, slug))
     .orderBy(asc(wikiPageSources.sort));
   return Promise.all(
     rows.map(async (s): Promise<ReviewSource> => {
+      if (s.text) return s.text.length <= REVIEW_TEXT_CHARS ? { title: s.title, content: { kind: "text", text: s.text } } : { title: s.title };
       const ext = s.objectKey?.split(".").pop()?.toLowerCase();
       const size = s.sizeBytes ?? Infinity;
       const readable =
         s.objectKey &&
-        ((s.fileType === "text" && size <= REVIEW_TEXT_CHARS * 4) ||
-          (s.fileType === "pdf" && size <= REVIEW_PDF_BYTES) ||
-          (s.fileType === "image" && size <= REVIEW_IMAGE_BYTES));
+        ((s.fileType === "pdf" && size <= REVIEW_PDF_BYTES) || (s.fileType === "image" && size <= REVIEW_IMAGE_BYTES));
       if (!readable) return { title: s.title };
       try {
-        const bytes = await getObjectBytes(s.objectKey!);
-        if (s.fileType === "text") {
-          const text = new TextDecoder().decode(bytes);
-          return text.length <= REVIEW_TEXT_CHARS ? { title: s.title, content: { kind: "text", text } } : { title: s.title };
-        }
-        const base64 = Buffer.from(bytes).toString("base64");
+        const base64 = Buffer.from(await getObjectBytes(s.objectKey!)).toString("base64");
         if (s.fileType === "pdf") return { title: s.title, content: { kind: "pdf", base64 } };
         return { title: s.title, content: { kind: "image", mediaType: ext === "png" ? "image/png" : "image/jpeg", base64 } };
       } catch (error) {
@@ -271,6 +279,13 @@ export async function runReview(db: Db, id: string, reviewer: WikiReviewer = def
  * 변경 반영. 만든 뒤 문서가 바뀌었으면(다른 변경이 먼저 반영) 덮어쓰지 않고 확인 대기로 돌린다.
  * 반영했으면 true.
  */
+/** 본문의 [[slug]] 링크로 페이지 간 연결을 다시 쓴다 (대상 페이지가 아직 없어도 남겨 둔다) */
+export async function syncLinks(tx: Exec, slug: string, body: string) {
+  const targets = [...new Set([...body.matchAll(/\[\[([a-z0-9-]{1,128})(?:\|[^\]]*)?\]\]/g)].map((m) => m[1]))].filter((t) => t !== slug);
+  await tx.delete(wikiLinks).where(eq(wikiLinks.fromSlug, slug));
+  if (targets.length) await tx.insert(wikiLinks).values(targets.map((toSlug, sort) => ({ fromSlug: slug, toSlug, sort })));
+}
+
 export async function applyRevision(db: Db, id: string): Promise<boolean> {
   return db.transaction(async (tx) => {
     const r = await getRevision(tx, id, true);
@@ -286,6 +301,7 @@ export async function applyRevision(db: Db, id: string): Promise<boolean> {
       .update(wikiPages)
       .set({ title: r.after.title, summary: r.after.summary, body: r.after.body, updatedOn: seoulToday() })
       .where(eq(wikiPages.slug, r.slug));
+    await syncLinks(tx, r.slug, r.after.body);
     await tx.update(wikiRevisions).set({ status: "applied" }).where(eq(wikiRevisions.id, id));
     // 반영되면 주석은 닫힘
     await tx.update(wikiComments).set({ status: "applied" }).where(eq(wikiComments.revisionId, id));
@@ -304,7 +320,7 @@ export async function cancelRevision(db: Db, id: string) {
 }
 
 /** 끊긴 검토 다시 돌리기 (서버 재시작 등으로 '검토 중'에 멈춘 변경) */
-export async function resumeStalledReviews(db: Db, olderThanMs = 30_000) {
+export async function resumeStalledReviews(db: Db, olderThanMs = STALLED_MS) {
   const isStalled = (id?: string) =>
     and(
       id ? eq(wikiRevisions.id, id) : undefined,

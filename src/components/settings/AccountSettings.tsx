@@ -1,7 +1,6 @@
 import { sql } from "drizzle-orm";
 import { connection } from "next/server";
 import { Database, Download, KeyRound } from "lucide-react";
-import { Button } from "@/components/ui";
 import { getCurrentUser } from "@/lib/auth";
 import { getDb } from "@/server/db/client";
 import { sources } from "@/server/db/schema";
@@ -69,11 +68,15 @@ export async function DataSettings() {
   }
   return (
     <SettingsSection id="data" title="데이터" icon={<Database className="size-4" />}>
-      <Row label="위키 내보내기">
-        <Button size="sm">
+      <Row label="위키 내보내기" hint="모든 페이지를 마크다운 파일로 묶은 zip">
+        <a
+          href="/api/wiki/export"
+          download
+          className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-line bg-surface px-2.5 text-[13px] font-medium hover:bg-sunken"
+        >
           <Download className="size-3.5" />
           내보내기
-        </Button>
+        </a>
       </Row>
       <Row label="원본 문서">
         <span className="text-[13px] text-muted tabular">{usage}</span>

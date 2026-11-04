@@ -62,12 +62,26 @@ export type SourceType =
   | "peer_advice"
   | "note";
 
+export type SourceWikiStatus = "processing" | "done" | "failed";
+
+/** 원본을 위키로 정리한 결과 */
+export interface SourceWikiResult {
+  /** 새로 만든 페이지 slug */
+  created: string[];
+  /** 고치려고 변경을 올린 페이지 slug (모순 검토를 거쳐 반영) */
+  updated: string[];
+  /** Claude가 남긴 한 줄 (정리할 내용이 없었던 이유 등) */
+  note?: string;
+}
+
 export interface Source {
   id: string;
   title: string;
   type: SourceType;
   fileType: "pdf" | "docx" | "xlsx" | "pptx" | "hwp" | "hwpx" | "text" | "image";
   addedAt: string;
+  /** 위키로 정리한 상태 (정리 기능 전의 원본은 없음) */
+  wiki?: { status: SourceWikiStatus } & Partial<SourceWikiResult>;
 }
 
 /** 복습 노출 일정. 간격 계산(망각 곡선)은 내부에서만 하고, 화면엔 "N일마다 · 다음 복습일"만 보여준다 */

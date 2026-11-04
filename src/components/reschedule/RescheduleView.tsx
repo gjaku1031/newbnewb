@@ -9,7 +9,7 @@ import type { RescheduleItem, RescheduleProposal } from "@/lib/types";
 import { Card, EmptyState, KindTag, PriorityBadge } from "@/components/ui";
 import { fmt } from "@/lib/date";
 import { useItems } from "@/lib/itemStore";
-import { useReschedule } from "@/components/workspace/hooks";
+import { useClaudeEnabled, useReschedule } from "@/components/workspace/hooks";
 import { mutate, refresh } from "@/components/workspace/store";
 import * as actions from "@/server/actions";
 import { displayKind } from "@/lib/items";
@@ -21,8 +21,41 @@ const claudePrompt = (id: string) => `newb의 재배치 제안(${id})을 불러�
 
 export function RescheduleView() {
   const p = useReschedule();
-  if (!p) return <EmptyState title="지금은 재배치 제안이 없어요" />;
+  if (!p || p.appliedAt) return <NoProposal applied={p ?? null} />;
   return <Proposal key={p.id} p={p} />;
+}
+
+/** 제안이 없을 때: 지금 일정을 Claude가 다시 살펴보게 (아침 브리핑과 함께 만든다) */
+function NoProposal({ applied }: { applied: RescheduleProposal | null }) {
+  const claude = useClaudeEnabled();
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const check = async () => {
+    setBusy(true);
+    setMessage(null);
+    const r = await actions.generateBriefingNow();
+    await refresh();
+    setBusy(false);
+    setMessage(r.ok ? (r.rescheduled ? null : "지금은 옮길 일이 없어요.") : r.error);
+  };
+  return (
+    <div className="space-y-6">
+      <EmptyState title="지금은 재배치 제안이 없어요">
+        <p className="text-[13px] text-muted">아침 브리핑을 만들 때 앞으로 7일에 일이 몰려 있으면 Claude가 제안해요.</p>
+        <button
+          type="button"
+          onClick={check}
+          disabled={busy || !claude}
+          className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-[13px] font-medium hover:bg-sunken disabled:opacity-50"
+        >
+          {busy ? "살펴보는 중… (1분 정도)" : "지금 살펴보기"}
+        </button>
+        {!claude && <p className="mt-2 text-[12.5px] text-danger">Claude API 키가 없어 살펴볼 수 없어요.</p>}
+        {message && <p className="mt-2 text-[12.5px] text-muted">{message}</p>}
+      </EmptyState>
+      {applied && <Proposal key={applied.id} p={applied} />}
+    </div>
+  );
 }
 
 function Proposal({ p }: { p: RescheduleProposal }) {

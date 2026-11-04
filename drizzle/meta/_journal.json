@@ -29,6 +29,20 @@
       "when": 1793513179029,
       "tag": "0003_passkeys",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1793801611649,
+      "tag": "0004_source_text_wiki",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1793801942745,
+      "tag": "0005_settings_schedule",
+      "breakpoints": true
     }
   ]
 }

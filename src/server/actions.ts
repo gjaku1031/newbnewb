@@ -18,6 +18,9 @@ import * as wiki from "@/server/services/wiki";
 import * as memosService from "@/server/services/memos";
 import * as records from "@/server/services/records";
 import * as cautionsService from "@/server/services/cautions";
+import * as sourceWiki from "@/server/services/sourceWiki";
+import * as briefingService from "@/server/services/briefing";
+import { ClaudeUnavailableError } from "@/server/ai/claude";
 import type { Caution } from "@/lib/types";
 
 /** 응답을 보낸 뒤 실행 (실패해도 요청은 성공으로 끝나고, 서버 로그에 남긴다) */
@@ -110,6 +113,14 @@ export async function addMemo(input: { id: string; text: string }) {
   later("메모 처리", () => memosService.processMemo(db, memo.id));
 }
 
+/** 위키로 정리하지 못한 원본을 다시 정리 */
+export async function retryOrganizeSource(id: string) {
+  await requireUser();
+  const db = getDb();
+  const sourceId = v.Id.parse(id);
+  if (await sourceWiki.retryOrganize(db, sourceId)) later("원본 정리", () => sourceWiki.organizeSource(db, sourceId));
+}
+
 /** 처리에 실패한 메모를 다시 정리 */
 export async function retryMemo(id: string) {
   await requireUser();
@@ -167,4 +178,28 @@ export async function reviewCaution(id: string) {
 export async function setCautionArchived(id: string, archived: boolean) {
   await requireUser();
   await cautionsService.setCautionArchived(getDb(), v.Id.parse(id), z.boolean().parse(archived));
+}
+
+/* ───────── 브리핑·설정 ───────── */
+
+const SettingsInput = z.object({
+  morningTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+  days: z.array(z.number().int().min(0).max(6)).max(7),
+});
+
+export async function saveDashboardSettings(input: { morningTime: string; days: number[] }) {
+  await requireUser();
+  await briefingService.saveSettings(getDb(), SettingsInput.parse(input));
+}
+
+/** 오늘 브리핑을 지금 만든다 (Claude). 재배치가 필요하면 제안도 */
+export async function generateBriefingNow(): Promise<{ ok: true; rescheduled: boolean } | { ok: false; error: string }> {
+  await requireUser();
+  try {
+    const r = await briefingService.generateBriefing(getDb());
+    return { ok: true, rescheduled: r.rescheduled };
+  } catch (error) {
+    console.error("[briefing] 만들기 실패", error);
+    return { ok: false, error: error instanceof ClaudeUnavailableError ? error.message : "브리핑을 만들지 못했어요. 잠시 뒤 다시 시도해 주세요." };
+  }
 }

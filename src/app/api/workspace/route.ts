@@ -4,6 +4,7 @@ import { getDb } from "@/server/db/client";
 import { loadWorkspace } from "@/server/services/workspace";
 import { resumeStalledReviews } from "@/server/services/wiki";
 import { resumeStalledMemos } from "@/server/services/memos";
+import { resumeStalledOrganize } from "@/server/services/sourceWiki";
 
 /** 작업공간 스냅샷 — 화면이 처리 중인 일을 기다리거나 다시 불러올 때 */
 export async function GET(request: Request) {
@@ -15,6 +16,7 @@ export async function GET(request: Request) {
       try {
         await resumeStalledReviews(db);
         await resumeStalledMemos(db);
+        await resumeStalledOrganize(db);
       } catch (error) {
         console.error("[workspace] 멈춘 처리 재개 실패", error);
       }

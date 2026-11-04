@@ -16,7 +16,7 @@ import {
   varchar,
 } from "drizzle-orm/mysql-core";
 import { sql } from "drizzle-orm";
-import type { MissingItem, QuestionRecord, RescheduleItem, WikiPage } from "@/lib/types";
+import type { MissingItem, QuestionRecord, RescheduleItem, SourceWikiResult, SourceWikiStatus, WikiPage } from "@/lib/types";
 import type { Conflict, EditNote, PageContent, WikiComment } from "@/lib/wikiTypes";
 import type { MemoResult, MemoStatus } from "@/lib/memoTypes";
 
@@ -125,7 +125,13 @@ export const sources = mysqlTable("sources", {
   sha256: char("sha256", { length: 64 }),
   /** 서버 전용: 자료를 준 사람 (화면에는 보내지 않음) */
   author: varchar("author", { length: 100 }),
+  /** 원본에서 뽑은 글자 (docx·xlsx·pptx·hwp·hwpx·텍스트). PDF·이미지는 Claude가 파일을 직접 읽어 null */
+  text: mediumtext("text"),
+  /** 위키로 정리: processing → done | failed (예전 원본·목데이터는 null) */
+  wikiStatus: varchar("wiki_status", { length: 12 }).$type<SourceWikiStatus>(),
+  wikiResult: json("wiki_result").$type<SourceWikiResult>(),
   createdAt: createdAt(),
+  updatedAt: updatedAt(),
 });
 
 export const wikiPages = mysqlTable("wiki_pages", {
@@ -365,3 +371,28 @@ export const authInvites = mysqlTable("auth_invites", {
   expiresAt: datetime("expires_at", { mode: "string", fsp: 3 }).notNull(),
   usedAt: datetime("used_at", { mode: "string", fsp: 3 }),
 });
+
+/* ───────── 설정·예약 작업 ───────── */
+
+/** 1인용 설정 (id = 1 한 줄) */
+export const userSettings = mysqlTable("user_settings", {
+  id: int("id").primaryKey(),
+  /** 아침 브리핑을 만들 시각 (한국 시간 HH:mm) */
+  morningTime: varchar("morning_time", { length: 5 }).notNull().default("08:00"),
+  /** 브리핑을 만들 요일 (0=일 … 6=토) */
+  days: json("days").$type<number[]>().notNull(),
+  updatedAt: updatedAt(),
+});
+
+/** 예약 작업을 하루 한 번만 돌리기 위한 기록 — (작업, 날짜)를 먼저 넣은 쪽만 실행 */
+export const scheduledRuns = mysqlTable(
+  "scheduled_runs",
+  {
+    job: varchar("job", { length: 32 }).notNull(),
+    runDate: date("run_date", { mode: "string" }).notNull(),
+    startedAt: createdAt(),
+    finishedAt: datetime("finished_at", { mode: "string", fsp: 3 }),
+    error: varchar("error", { length: 500 }),
+  },
+  (t) => [primaryKey({ columns: [t.job, t.runDate] })],
+);

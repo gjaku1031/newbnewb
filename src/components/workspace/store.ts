@@ -134,7 +134,11 @@ async function load(): Promise<boolean> {
 
 /** 서버에서 아직 처리 중인 일이 있는지 */
 export function hasServerWork(s: WorkspaceSnapshot) {
-  return s.wiki.revisions.some((r) => r.status === "reviewing") || s.memos.some((m) => m.status === "processing");
+  return (
+    s.wiki.revisions.some((r) => r.status === "reviewing") ||
+    s.memos.some((m) => m.status === "processing") ||
+    s.wiki.sources.some((src) => src.wiki?.status === "processing")
+  );
 }
 
 /* ───────── 저장 오류 표시 ───────── */
