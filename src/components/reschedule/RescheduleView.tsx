@@ -16,7 +16,8 @@ import { displayKind } from "@/lib/items";
 import { TODAY } from "@/lib/today";
 import { ItemLink } from "@/components/item/ItemPeek";
 
-const CLAUDE_PROMPT = `newb의 재배치 제안(r1)을 불러와서 같이 상의하자. 법인카드 정리를 월요일로 미루는 게 괜찮은지 봐줘.`;
+/** Claude Desktop에 붙여 넣을 말 (제안 id로 newb에서 불러오게) */
+const claudePrompt = (id: string) => `newb의 재배치 제안(${id})을 불러와서 같이 상의하자. 옮기려는 항목마다 괜찮은지 봐줘.`;
 
 export function RescheduleView() {
   const p = useReschedule();
@@ -44,7 +45,7 @@ function Proposal({ p }: { p: RescheduleProposal }) {
 
   const copyPrompt = async () => {
     try {
-      await navigator.clipboard.writeText(CLAUDE_PROMPT);
+      await navigator.clipboard.writeText(claudePrompt(p.id));
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1800);
     } catch {
@@ -127,7 +128,7 @@ function Proposal({ p }: { p: RescheduleProposal }) {
             <MessageSquareText className="size-4 text-accent" />
             Claude Desktop에서 이어서 상의하기
           </div>
-          <div className="mt-3 rounded-lg bg-sunken p-3 text-[12.5px] leading-relaxed">{CLAUDE_PROMPT}</div>
+          <div className="mt-3 rounded-lg bg-sunken p-3 text-[12.5px] leading-relaxed">{claudePrompt(p.id)}</div>
           <button
             type="button"
             onClick={copyPrompt}

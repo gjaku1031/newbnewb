@@ -19,15 +19,6 @@ export interface Tag {
   label: string;
   color: string;
 }
-export const DEFAULT_TAGS: Tag[] = [
-  { id: "meeting", label: "회의", color: "#12a594" },
-  { id: "focus", label: "집중", color: "#e5641b" },
-  { id: "report", label: "보고", color: "#c27c0e" },
-  { id: "finance", label: "재무", color: "#d6409f" },
-  { id: "onboarding", label: "온보딩", color: "#2a7fd4" },
-  { id: "personal", label: "개인", color: "#85847e" },
-];
-
 /** 달성률 % (일정은 null) */
 export function progress(i: Item): number | null {
   if (i.kind === "event") return null;

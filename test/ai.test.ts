@@ -141,3 +141,27 @@ describe("Claude 위키 검토기", () => {
     expect(res.summary).toBe("모순 2건");
   });
 });
+
+describe("규칙 기반 처리기 (API 키 없을 때) — 목데이터 없이 실제 데이터만 본다", () => {
+  it("메모는 실제 위키 페이지 제목으로만 연결하고, 페이지가 없으면 연결하지 않는다", async () => {
+    const memo = "주간보고 마감이 16시로 바뀐대";
+    const pages = [
+      { slug: "weekly", title: "주간보고 작성법", summary: "" },
+      { slug: "card", title: "법인카드 사용 규정", summary: "" },
+    ];
+    expect((await new RuleMemoProcessor().process(memo, "2026-11-04", pages)).wiki.map((w) => w.slug)).toEqual(["weekly"]);
+    expect((await new RuleMemoProcessor().process(memo, "2026-11-04", [])).wiki).toEqual([]);
+  });
+
+  it("위키 검토는 실제로 올린 원본 문서(텍스트)와만 비교한다", async () => {
+    const before = { title: "법인카드", summary: "", body: "- 증빙 제출" };
+    const after = { title: "법인카드", summary: "", body: "- 증빙 제출\n- 법인카드 증빙은 익월 5일까지 ERP 입력" };
+    const change = { slug: "card", before, after };
+    // 원본이 없으면 비교할 근거도 없다 (예전처럼 지어낸 규정과 비교하지 않음)
+    expect((await new RuleReviewer().review(change, [], [])).conflicts).toEqual([]);
+    const sources = [{ title: "법인카드 규정.txt", content: { kind: "text" as const, text: "법인카드 증빙은 익월 3일까지 ERP 입력" } }];
+    const { conflicts } = await new RuleReviewer().review(change, [], sources);
+    expect(conflicts).toHaveLength(1);
+    expect(conflicts[0]).toMatchObject({ ref: { kind: "source", title: "법인카드 규정.txt" }, reason: "기한 다름 · 익월 3일 ↔ 익월 5일" });
+  });
+});

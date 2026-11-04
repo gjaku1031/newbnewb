@@ -2,7 +2,7 @@ import { addDays, format, nextDay, parseISO, type Day } from "date-fns";
 import { isRealDate } from "@/lib/date";
 
 /**
- * 메모 처리기 인터페이스. 운영에선 Claude(src/server/ai/memo.ts), 키가 없으면 아래 규칙 목업.
+ * 메모 처리기 인터페이스. 운영에선 Claude(src/server/ai/memo.ts), 키가 없으면 아래 규칙 기반 처리기.
  * 입력: 러프한 메모 원문 / 출력: 정리본 + 만들 항목·알아올 것·위키 갱신 계획
  */
 
@@ -56,7 +56,7 @@ export interface MemoProcessor {
   process(text: string, today: string, pages: WikiPageRef[]): Promise<MemoPlan>;
 }
 
-/* ───────── 목업 규칙 처리기 ───────── */
+/* ───────── 규칙 기반 처리기 (API 키가 없을 때) ───────── */
 
 /** 자주 나는 오타·줄임말 */
 const FIXES: [RegExp, string][] = [
@@ -95,15 +95,23 @@ const TASK_VERB = /(해\s?오라|해와|준비|제출|보내|작성|정리|챙�
 const UNSURE = /(모르겠|모름|헷갈|뭔지|뭘|뭐뭐|확실하지|애매)/;
 const WEEKDAY: Record<string, Day> = { 일: 0, 월: 1, 화: 2, 수: 3, 목: 4, 금: 5, 토: 6 };
 
-/** 위키 주제 키워드 → 페이지 */
-const WIKI_TOPICS: [RegExp, string][] = [
-  [/(접대비|법인카드|카드)/, "corporate-card"],
-  [/(주간\s?보고)/, "weekly-report"],
-  [/(회의실|자원예약)/, "meeting-room"],
-  [/(결재|품의)/, "e-approval"],
-  [/(메일|회신)/, "email-etiquette"],
-  [/(경비|ERP|계정과목)/, "erp-expense"],
-];
+/** 페이지 제목에 흔히 붙는 말 — 이것만 겹쳐서는 같은 주제로 보지 않는다 */
+const GENERIC_TITLE_WORDS = new Set(["사용", "규정", "가이드", "양식", "방법", "안내", "정리", "기본", "관련", "업무", "개정"]);
+
+/** 메모에 위키 페이지 제목의 낱말이 들어 있으면 그 페이지 (가장 많이 겹치는 것). 없으면 undefined */
+function matchPage(text: string, pages: WikiPageRef[]): string | undefined {
+  let best: string | undefined;
+  let bestScore = 0;
+  for (const p of pages) {
+    const words = (p.title.match(/[가-힣A-Za-z0-9]{2,}/g) ?? []).filter((w) => !GENERIC_TITLE_WORDS.has(w));
+    const score = words.filter((w) => text.includes(w)).length;
+    if (score > bestScore) {
+      best = p.slug;
+      bestScore = score;
+    }
+  }
+  return best;
+}
 const MISTAKE = /(지적|혼났|혼남|실수|틀렸|틀림|반려|다시 (써|해|하)|주의하래|하지 말래|하지 말라|빠뜨|까먹)/;
 const FACT = /(래|한대|라고 함|해야 ?(함|돼|된대)|이래|바뀐)/;
 
@@ -151,7 +159,7 @@ function findLocation(t: string): string | undefined {
 export class RuleMemoProcessor implements MemoProcessor {
   id = "rule-memo@v0";
 
-  async process(text: string, today: string): Promise<MemoPlan> {
+  async process(text: string, today: string, pages: WikiPageRef[] = []): Promise<MemoPlan> {
     const cleaned = toSentences(fixTypos(text));
     const plan: MemoPlan = { cleaned, events: [], tasks: [], asks: [], wiki: [], cautions: [] };
     const role = cleaned.match(ROLE)?.[1];
@@ -180,18 +188,14 @@ export class RuleMemoProcessor implements MemoProcessor {
 
     // 지적·실수 → 주의할 점 (실제로는 Claude가 '맞는 방법' 한 줄로 요약)
     if (MISTAKE.test(cleaned)) {
-      const wikiSlug = WIKI_TOPICS.find(([re]) => re.test(cleaned))?.[1];
+      const wikiSlug = matchPage(cleaned, pages);
       plan.cautions.push({ point: cleaned, by: role, wikiSlug });
       return plan;
     }
 
     if (FACT.test(cleaned)) {
-      for (const [re, slug] of WIKI_TOPICS) {
-        if (re.test(cleaned) && !(slug === "meeting-room" && ev)) {
-          plan.wiki.push({ slug, line: cleaned });
-          break;
-        }
-      }
+      const slug = matchPage(cleaned, pages);
+      if (slug) plan.wiki.push({ slug, line: cleaned });
     }
     return plan;
   }

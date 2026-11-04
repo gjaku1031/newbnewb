@@ -1,6 +1,6 @@
 import "server-only";
 import { sql } from "drizzle-orm";
-import { DEFAULT_TAGS } from "@/lib/items";
+import type { Tag } from "@/lib/items";
 import { items as mockItems } from "./mocks/items";
 import { memos as mockMemos } from "./mocks/memos";
 import { cautions as mockCautions } from "./mocks/cautions";
@@ -15,6 +15,16 @@ import { dtIn } from "@/server/db/convert";
 import type { Db } from "@/server/db/types";
 import { writeItem } from "@/server/services/items";
 import { writeCaution } from "@/server/services/cautions";
+
+/** 테스트용 기본 태그 */
+const DEFAULT_TAGS: Tag[] = [
+  { id: "meeting", label: "회의", color: "#12a594" },
+  { id: "focus", label: "집중", color: "#e5641b" },
+  { id: "report", label: "보고", color: "#c27c0e" },
+  { id: "finance", label: "재무", color: "#d6409f" },
+  { id: "onboarding", label: "온보딩", color: "#2a7fd4" },
+  { id: "personal", label: "개인", color: "#85847e" },
+];
 
 /** 시드가 지우고 다시 채우는 테이블 (FK 역순) */
 const TABLES = [

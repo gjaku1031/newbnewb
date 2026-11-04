@@ -3,7 +3,7 @@ import { diffLines } from "@/lib/diff";
 
 /**
  * 위키 변경 검토기 인터페이스. 운영에선 Claude(src/server/ai/wikiReview.ts)가 위키 전체와 원본 문서를 읽고 모순을 찾는다.
- * API 키가 없으면 아래 규칙 목업.
+ * API 키가 없으면 아래 규칙 기반 검토기 (숫자·금액·기한만 비교).
  */
 export interface WikiChange {
   slug: string;
@@ -22,7 +22,7 @@ export interface WikiReviewer {
   review(change: WikiChange, allPages: (PageContent & { slug: string })[], sources: ReviewSource[]): Promise<ReviewResult>;
 }
 
-/* ───────── 목업 구현: 숫자·금액·기한 규칙 ───────── */
+/* ───────── 규칙 기반 검토기: 숫자·금액·기한 ───────── */
 
 type FactKind = "money" | "time" | "deadline" | "percent";
 interface Fact {
@@ -31,16 +31,6 @@ interface Fact {
 }
 
 const KIND_LABEL: Record<FactKind, string> = { money: "금액", time: "시간", deadline: "기한", percent: "비율" };
-
-/** 원본 문서에서 뽑아 둔 사실 (목업) — 실제로는 원본 텍스트 검색 */
-const SOURCE_FACTS: { title: string; text: string }[] = [
-  { title: "법인카드 사용 규정 (2026 개정)", text: "1회 50만원 초과 사용 시 사전 품의 필요" },
-  { title: "법인카드 사용 규정 (2026 개정)", text: "증빙은 익월 3일까지 ERP 입력 및 영수증 업로드" },
-  { title: "법인카드 사용 규정 (2026 개정)", text: "접대비 1인당 10만원 초과 시 팀장 승인" },
-  { title: "주간보고 양식", text: "매주 금요일 17:00까지 팀장에게 메일로 제출" },
-  { title: "ERP 경비처리 가이드", text: "카드 사용분 경비청구는 익월 3일까지" },
-  { title: "신입사원 업무 매뉴얼 v3.2", text: "외부 손님 미팅 회의실은 하루 전까지 예약" },
-];
 
 const plain = (s: string) =>
   s
@@ -84,7 +74,7 @@ const sentences = (c: PageContent) =>
 export class RuleReviewer implements WikiReviewer {
   id = "rule-reviewer@v1";
 
-  async review(change: WikiChange, allPages: (PageContent & { slug: string })[]): Promise<ReviewResult> {
+  async review(change: WikiChange, allPages: (PageContent & { slug: string })[], sources: ReviewSource[] = []): Promise<ReviewResult> {
     // 1) 바뀐(추가된) 문장
     const added: string[] = [];
     if (change.after.title !== change.before.title) added.push(plain(change.after.title));
@@ -100,7 +90,11 @@ export class RuleReviewer implements WikiReviewer {
     for (const p of allPages)
       if (p.slug !== change.slug)
         for (const s of sentences(p)) refs.push({ ref: { kind: "page", slug: p.slug, title: p.title }, text: s });
-    for (const f of SOURCE_FACTS) refs.push({ ref: { kind: "source", title: f.title }, text: f.text });
+    // 원본 문서는 글자로 읽을 수 있는 것만 (PDF·이미지는 Claude 검토기에서)
+    for (const src of sources)
+      if (src.content?.kind === "text")
+        for (const line of src.content.text.split(/\n+/).map(plain).filter(Boolean))
+          refs.push({ ref: { kind: "source", title: src.title }, text: line });
 
     // 3) 같은 주제(공통 단어)인데 같은 종류의 값이 다르면 모순
     const conflicts: Conflict[] = [];

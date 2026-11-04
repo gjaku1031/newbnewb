@@ -17,6 +17,7 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useState, useSyncExternalStore } from "react";
+import { useReschedule } from "@/components/workspace/hooks";
 
 /* 데스크톱 사이드바 접힘 상태 — 브라우저에 기억 (Ctrl/⌘ + \ 로 토글) */
 const COLLAPSE_KEY = "newb.sidebar.collapsed";
@@ -60,6 +61,7 @@ function isActive(pathname: string, href: string) {
 
 function SidebarContent({ onNavigate, onCollapse }: { onNavigate?: () => void; onCollapse?: () => void }) {
   const pathname = usePathname();
+  const proposal = useReschedule();
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center gap-2.5 px-4 pt-5 pb-4">
@@ -105,19 +107,22 @@ function SidebarContent({ onNavigate, onCollapse }: { onNavigate?: () => void; o
         })}
       </nav>
 
-      <div className="mx-2 mt-5">
-        <Link
-          href="/reschedule"
-          onClick={onNavigate}
-          className="flex items-start gap-2.5 rounded-lg border border-dashed border-line-strong px-3 py-2.5 text-[13px] hover:bg-surface"
-        >
-          <Shuffle className="mt-0.5 size-4 shrink-0 text-warn" strokeWidth={2} />
-          <span>
-            <span className="font-medium">재배치 제안 1건</span>
-            <span className="block text-[12px] text-muted">이번 주 P0~P1이 몰려 있어요</span>
-          </span>
-        </Link>
-      </div>
+      {/* 아직 반영하지 않은 재배치 제안이 있을 때만 */}
+      {proposal && !proposal.appliedAt && (
+        <div className="mx-2 mt-5">
+          <Link
+            href="/reschedule"
+            onClick={onNavigate}
+            className="flex items-start gap-2.5 rounded-lg border border-dashed border-line-strong px-3 py-2.5 text-[13px] hover:bg-surface"
+          >
+            <Shuffle className="mt-0.5 size-4 shrink-0 text-warn" strokeWidth={2} />
+            <span className="min-w-0">
+              <span className="font-medium">재배치 제안 {proposal.items.length}건</span>
+              <span className="line-clamp-2 block text-[12px] text-muted">{proposal.summary}</span>
+            </span>
+          </Link>
+        </div>
+      )}
 
       <div className="mt-auto space-y-1 p-2">
         <Link
